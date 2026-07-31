@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
 import {
+  buildFixedCrateCardRows,
   computeMinimumPlaylistTracks,
   generateCards,
   generateSessionCalls,
   generateSessionCallsFromTracks,
   getPlaylistTrackCountForPlaylists,
+  planFixedCrateRoundCalls,
   planRoundSessionCalls,
   resolvePlaylistTracksForPlaylists,
   resolveTrackKeys,
@@ -15,6 +17,7 @@ import {
 import {
   createRoundTrackSnapshots,
   createRoundTrackSnapshotsFromTracks,
+  createRoundTrackSnapshotsPreservingOrder,
   getRoundSnapshotTracks,
 } from "src/lib/bingoGameModel";
 import { savePlaylistForRound, setActivePlaylistForRound } from "src/lib/bingoCrateModel";
@@ -319,6 +322,12 @@ export async function POST(request: NextRequest) {
     const roundModes = normalizeRoundModes(body.round_modes, roundCount);
     const roundPlaylistIds = normalizeRoundPlaylistIds(body.round_playlist_ids, roundCount);
     const gameStructure = body.game_structure === "fixed_crates" ? "fixed_crates" : "shared_pool";
+    if (gameStructure === "fixed_crates" && (wantsPreset || fixedPoolTracks)) {
+      return NextResponse.json(
+        { error: "Fixed Crates mode cannot be combined with a Favorite/preset pool." },
+        { status: 400 }
+      );
+    }
     const resolvedPlaylistsByRound = collectResolvedPlaylistIdsByRound(
       {
         playlist_id: selectedPlaylistIds[0] ?? null,
@@ -521,71 +530,176 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      if (fixedPoolTracks && fixedPoolTracks.length > 0) {
-        await createRoundTrackSnapshotsFromTracks(db, session.id, roundCount, fixedPoolTracks);
+      if (gameStructure === "fixed_crates") {
+        // Fixed Crates: each round is a genuinely distinct 75-track crate. Playlist
+        // order must survive untouched (call order = playlist order), and every round
+        // gets its own independently-random card set — no relabeling, no reuse.
+        await createRoundTrackSnapshotsPreservingOrder(db, session.id, resolvedPlaylistsByRound);
+
+        for (let round = 1; round <= roundCount; round += 1) {
+          const snapshotTracks = await getRoundSnapshotTracks(db, session.id, round);
+          if (snapshotTracks.length === 0) {
+            throw new Error(`Failed to build immutable game playlist for round ${round}.`);
+          }
+
+          const plannedCalls = planFixedCrateRoundCalls(snapshotTracks, session.id, round);
+
+          const createdPlaylist = await savePlaylistForRound(
+            db,
+            session.id,
+            round,
+            plannedCalls.map((planned) => ({
+              id: -(planned.call_index ?? round),
+              call_index: planned.call_index,
+              ball_number: planned.ball_number,
+              column_letter: planned.column_letter,
+              track_title: planned.track_title,
+              artist_name: planned.artist_name,
+              album_name: planned.album_name,
+              side: planned.side,
+              position: planned.position,
+              status: "pending",
+              track_key: planned.playlist_track_key,
+            }))
+          );
+
+          await setActivePlaylistForRound(db, session.id, round, createdPlaylist.playlist_letter);
+
+          const roundCardRows = buildFixedCrateCardRows(
+            plannedCalls,
+            round,
+            session.card_count,
+            session.card_label_mode as "track_artist" | "track_only",
+            session.session_code
+          );
+
+          const { error: roundCardsInsertError } = await db.from("bingo_session_round_cards").insert(
+            roundCardRows.map((row) => ({
+              session_id: session.id,
+              round_number: row.round_number,
+              card_number: row.card_number,
+              card_identifier: row.card_identifier,
+              has_free_space: row.has_free_space,
+              grid: row.grid,
+            }))
+          );
+          if (roundCardsInsertError) throw new Error(roundCardsInsertError.message);
+
+          if (round === 1) {
+            // Seed the LIVE tables directly from this SAME plannedCalls/roundCardRows data
+            // (not a second, independent generation path) so round 1 can never drift from
+            // what's stored above — this is the fix for the round-1 dual-mechanism bug.
+            const { data: insertedCalls, error: insertCallsError } = await db
+              .from("bingo_session_calls")
+              .insert(
+                plannedCalls.map((planned) => ({
+                  session_id: session.id,
+                  playlist_track_key: planned.playlist_track_key,
+                  call_index: planned.call_index,
+                  ball_number: planned.ball_number,
+                  column_letter: planned.column_letter,
+                  track_title: planned.track_title,
+                  artist_name: planned.artist_name,
+                  album_name: planned.album_name,
+                  side: planned.side,
+                  position: planned.position,
+                  link_group: planned.link_group ?? null,
+                  theme_hint: planned.theme_hint ?? null,
+                  status: "pending",
+                }))
+              )
+              .select("id, ball_number");
+            if (insertCallsError) throw new Error(insertCallsError.message);
+
+            const ballNumberToCallId = new Map<number, number>(
+              ((insertedCalls ?? []) as Array<{ id: number; ball_number: number | null }>)
+                .filter((call): call is { id: number; ball_number: number } => call.ball_number !== null)
+                .map((call) => [call.ball_number, call.id])
+            );
+
+            const liveCardRows = roundCardRows.map((row) => ({
+              session_id: session.id,
+              card_number: row.card_number,
+              card_identifier: row.card_identifier,
+              has_free_space: row.has_free_space,
+              grid: row.grid.map((cell) =>
+                cell.free || cell.ball_number == null
+                  ? cell
+                  : { ...cell, call_id: ballNumberToCallId.get(cell.ball_number) ?? null }
+              ),
+            }));
+
+            const { error: liveCardsInsertError } = await db.from("bingo_cards").insert(liveCardRows);
+            if (liveCardsInsertError) throw new Error(liveCardsInsertError.message);
+          }
+        }
       } else {
-        await createRoundTrackSnapshots(db, session.id, resolvedPlaylistsByRound);
-      }
-
-      const drawOrderHistory = new Map<string, number[]>();
-      for (let round = 1; round <= roundCount; round += 1) {
-        const snapshotTracks = await getRoundSnapshotTracks(db, session.id, round);
-        if (snapshotTracks.length === 0) {
-          throw new Error(`Failed to build immutable game playlist for round ${round}.`);
+        if (fixedPoolTracks && fixedPoolTracks.length > 0) {
+          await createRoundTrackSnapshotsFromTracks(db, session.id, roundCount, fixedPoolTracks);
+        } else {
+          await createRoundTrackSnapshots(db, session.id, resolvedPlaylistsByRound);
         }
 
-        const plannedCalls = planRoundSessionCalls(snapshotTracks, session.id, round, 0, {
-          preservePlacement: true,
-          drawOrderHistory,
-        });
+        const drawOrderHistory = new Map<string, number[]>();
+        for (let round = 1; round <= roundCount; round += 1) {
+          const snapshotTracks = await getRoundSnapshotTracks(db, session.id, round);
+          if (snapshotTracks.length === 0) {
+            throw new Error(`Failed to build immutable game playlist for round ${round}.`);
+          }
 
-        // Record each track's call_index for use when planning subsequent rounds.
-        for (const call of plannedCalls) {
-          const hist = drawOrderHistory.get(call.playlist_track_key) ?? [];
-          hist.push(call.call_index);
-          drawOrderHistory.set(call.playlist_track_key, hist);
+          const plannedCalls = planRoundSessionCalls(snapshotTracks, session.id, round, 0, {
+            preservePlacement: true,
+            drawOrderHistory,
+          });
+
+          // Record each track's call_index for use when planning subsequent rounds.
+          for (const call of plannedCalls) {
+            const hist = drawOrderHistory.get(call.playlist_track_key) ?? [];
+            hist.push(call.call_index);
+            drawOrderHistory.set(call.playlist_track_key, hist);
+          }
+
+          const createdPlaylist = await savePlaylistForRound(
+            db,
+            session.id,
+            round,
+            plannedCalls.map((planned) => ({
+              id: -(planned.call_index ?? round),
+              call_index: planned.call_index,
+              ball_number: planned.ball_number,
+              column_letter: planned.column_letter,
+              track_title: planned.track_title,
+              artist_name: planned.artist_name,
+              album_name: planned.album_name,
+              side: planned.side,
+              position: planned.position,
+              status: "pending",
+              track_key: planned.playlist_track_key,
+            }))
+          );
+
+          await setActivePlaylistForRound(db, session.id, round, createdPlaylist.playlist_letter);
         }
 
-        const createdPlaylist = await savePlaylistForRound(
+        const roundOneTracks = await getRoundSnapshotTracks(db, session.id, 1);
+        if (roundOneTracks.length === 0) {
+          throw new Error("Failed to build immutable game playlist for round 1.");
+        }
+
+        if (fixedPoolTracks && fixedPoolTracks.length > 0) {
+          await generateSessionCallsFromTracks(db, session.id, fixedPoolTracks, { roundNumber: 1 });
+        } else {
+          await generateSessionCalls(db, session.id, resolvedPlaylistsByRound.get(1) ?? [], { roundNumber: 1 });
+        }
+
+        await generateCards(
           db,
           session.id,
-          round,
-          plannedCalls.map((planned) => ({
-            id: -(planned.call_index ?? round),
-            call_index: planned.call_index,
-            ball_number: planned.ball_number,
-            column_letter: planned.column_letter,
-            track_title: planned.track_title,
-            artist_name: planned.artist_name,
-            album_name: planned.album_name,
-            side: planned.side,
-            position: planned.position,
-            status: "pending",
-            track_key: planned.playlist_track_key,
-          }))
+          session.card_count,
+          session.card_label_mode as "track_artist" | "track_only",
+          session.session_code
         );
-
-        await setActivePlaylistForRound(db, session.id, round, createdPlaylist.playlist_letter);
       }
-
-      const roundOneTracks = await getRoundSnapshotTracks(db, session.id, 1);
-      if (roundOneTracks.length === 0) {
-        throw new Error("Failed to build immutable game playlist for round 1.");
-      }
-
-      if (fixedPoolTracks && fixedPoolTracks.length > 0) {
-        await generateSessionCallsFromTracks(db, session.id, fixedPoolTracks, { roundNumber: 1 });
-      } else {
-        await generateSessionCalls(db, session.id, resolvedPlaylistsByRound.get(1) ?? [], { roundNumber: 1 });
-      }
-
-      await generateCards(
-        db,
-        session.id,
-        session.card_count,
-        session.card_label_mode as "track_artist" | "track_only",
-        session.session_code
-      );
     } catch (error) {
       await db.from("bingo_sessions").delete().eq("id", session.id);
       const message = error instanceof Error ? error.message : "Failed to generate calls/cards";

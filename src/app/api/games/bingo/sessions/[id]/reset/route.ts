@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
 import { backfillMissingLegacyPlaylists, getPlaylistsForSession, getPlaylistByLetter } from "src/lib/bingoCrateModel";
-import { generateCards, planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
+import { generateCards, planFixedCrateRoundCalls, planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
 import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
+import { syncRoundCardsToLive } from "src/lib/bingoCratePrint";
 
 export const runtime = "nodejs";
 
@@ -14,6 +15,7 @@ type SessionRow = {
   card_label_mode: "track_artist" | "track_only";
   session_code: string;
   cards_per_round_enabled: boolean;
+  game_structure: string;
 };
 
 function resolveSessionPlaylistIds(session: SessionRow): number[] {
@@ -37,7 +39,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
 
   const sessionQuery = (db
     .from("bingo_sessions")
-    .select("id, playlist_id, playlist_ids, card_count, card_label_mode, session_code, cards_per_round_enabled") as unknown as {
+    .select("id, playlist_id, playlist_ids, card_count, card_label_mode, session_code, cards_per_round_enabled, game_structure") as unknown as {
       eq: (column: string, value: number) => {
         maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
       };
@@ -93,7 +95,9 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     const tracks = snapshotTracks.length > 0
       ? snapshotTracks
       : await resolvePlaylistTracksForPlaylists(db, resolveSessionPlaylistIds(typedSession));
-    plannedCalls = planRoundSessionCalls(tracks, sessionId, 1, 0, { preservePlacement: snapshotTracks.length > 0 });
+    plannedCalls = typedSession.game_structure === "fixed_crates"
+      ? planFixedCrateRoundCalls(tracks, sessionId, 1)
+      : planRoundSessionCalls(tracks, sessionId, 1, 0, { preservePlacement: snapshotTracks.length > 0 });
   }
 
   const { data: existingCalls, error: existingError } = await db
@@ -217,7 +221,12 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
 
   if (sessionError) return NextResponse.json({ error: sessionError.message }, { status: 500 });
 
-  if (typedSession.cards_per_round_enabled) {
+  if (typedSession.game_structure === "fixed_crates") {
+    // Copy round 1's own precomputed card set back into the live table, rather than
+    // regenerating a fresh random pattern — keeps reset consistent with whatever was
+    // already printed in advance for round 1.
+    await syncRoundCardsToLive(db, sessionId, 1);
+  } else if (typedSession.cards_per_round_enabled) {
     const { error: deleteCardsError } = await db
       .from("bingo_cards")
       .delete()

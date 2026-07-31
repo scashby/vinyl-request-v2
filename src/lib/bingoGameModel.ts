@@ -1,5 +1,6 @@
 import type { BingoDbClient } from "src/lib/bingoDb";
 import {
+  buildOrderPreservingRoundPool,
   buildRoundTrackPool,
   type BingoCardCell,
   type GameMode,
@@ -105,6 +106,58 @@ export async function createRoundTrackSnapshots(
   for (const [roundNumber, playlistIds] of Array.from(resolvedPlaylistsByRound.entries()).sort((left, right) => left[0] - right[0])) {
     const tracks = await resolvePlaylistTracksForPlaylists(db, playlistIds);
     const gameTracks = buildRoundTrackPool(tracks, sessionId, roundNumber);
+
+    gameTracks.forEach((track, index) => {
+      rows.push({
+        session_id: sessionId,
+        round_number: roundNumber,
+        slot_index: index + 1,
+        playlist_track_key: track.trackKey,
+        source_playlist_id: null,
+        track_title: track.trackTitle,
+        artist_name: track.artistName,
+        album_name: track.albumName,
+        side: track.side,
+        position: track.position,
+        link_group: track.linkGroup ?? null,
+        theme_hint: track.themeHint ?? null,
+      });
+    });
+  }
+
+  const { error } = await db.from("bingo_session_round_tracks").insert(rows);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Fixed Crates mode: unlike createRoundTrackSnapshots (which shuffles via
+ * buildRoundTrackPool -- correct for Shared Pool, where the physical vinyl stays in a
+ * fixed slot all night), each crate's own admin-configured playlist order must survive
+ * untouched, since call order is derived directly from it. No shuffle here.
+ */
+export async function createRoundTrackSnapshotsPreservingOrder(
+  db: BingoDbClient,
+  sessionId: number,
+  resolvedPlaylistsByRound: Map<number, number[]>
+): Promise<void> {
+  const rows: Array<{
+    session_id: number;
+    round_number: number;
+    slot_index: number;
+    playlist_track_key: string;
+    source_playlist_id: number | null;
+    track_title: string;
+    artist_name: string;
+    album_name: string | null;
+    side: string | null;
+    position: string | null;
+    link_group: string | null;
+    theme_hint: string | null;
+  }> = [];
+
+  for (const [roundNumber, playlistIds] of Array.from(resolvedPlaylistsByRound.entries()).sort((left, right) => left[0] - right[0])) {
+    const tracks = await resolvePlaylistTracksForPlaylists(db, playlistIds);
+    const gameTracks = buildOrderPreservingRoundPool(tracks);
 
     gameTracks.forEach((track, index) => {
       rows.push({

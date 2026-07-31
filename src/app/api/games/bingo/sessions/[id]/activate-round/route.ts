@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
-import { generateCards, planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
+import { generateCards, planFixedCrateRoundCalls, planRoundSessionCalls, resolvePlaylistTracksForPlaylists } from "src/lib/bingoEngine";
 import { getPlaylistByLetter } from "src/lib/bingoCrateModel";
 import { getRoundSnapshotTracks } from "src/lib/bingoGameModel";
 import { resolveRoundPlaylistIds, type RoundPlaylistEntry } from "src/lib/bingoRoundPlaylists";
 import { rehydrateBingoCardLabels } from "src/lib/playlistMetadataSync";
+import { syncRoundCardsToLive } from "src/lib/bingoCratePrint";
 
 export const runtime = "nodejs";
 
@@ -37,6 +38,7 @@ type SessionRow = {
   card_label_mode: "track_artist" | "track_only";
   session_code: string;
   cards_per_round_enabled: boolean;
+  game_structure: string;
   active_playlist_letter_by_round: { round: number; letter: string }[] | null;
 };
 
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const sessionQuery = (db
       .from("bingo_sessions")
-      .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count, card_count, card_label_mode, session_code, cards_per_round_enabled, active_playlist_letter_by_round") as unknown as {
+      .select("id, playlist_id, playlist_ids, round_playlist_ids, round_count, card_count, card_label_mode, session_code, cards_per_round_enabled, game_structure, active_playlist_letter_by_round") as unknown as {
         eq: (column: string, value: number) => {
           maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>;
         };
@@ -113,7 +115,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const tracks = snapshotTracks.length > 0
         ? snapshotTracks
         : await resolvePlaylistTracksForPlaylists(db, resolveRoundPlaylistIds(typedSession, requestedRound));
-      plannedCalls = planRoundSessionCalls(tracks, sessionId, requestedRound, 0, { preservePlacement: snapshotTracks.length > 0 });
+      plannedCalls = typedSession.game_structure === "fixed_crates"
+        ? planFixedCrateRoundCalls(tracks, sessionId, requestedRound)
+        : planRoundSessionCalls(tracks, sessionId, requestedRound, 0, { preservePlacement: snapshotTracks.length > 0 });
     }
 
     const { data: existingCalls, error: existingError } = await db
@@ -235,7 +239,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (updateSessionError) return NextResponse.json({ error: updateSessionError.message }, { status: 500 });
 
-    if (typedSession.cards_per_round_enabled) {
+    if (typedSession.game_structure === "fixed_crates") {
+      // Copy this round's own precomputed card set (built at session creation) into the
+      // live table, rather than regenerating a fresh random pattern — so whatever the
+      // admin already printed in advance matches exactly what's live.
+      await syncRoundCardsToLive(db, sessionId, requestedRound);
+    } else if (typedSession.cards_per_round_enabled) {
       const { error: deleteCardsError } = await db
         .from("bingo_cards")
         .delete()

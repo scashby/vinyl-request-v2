@@ -1,6 +1,5 @@
 import type { BingoDbClient } from "src/lib/bingoDb";
 import type { BingoCardCell } from "src/lib/bingoEngine";
-import { getPlaylistByLetter, getPlaylistsForRound } from "src/lib/bingoCrateModel";
 
 type PreviewCard = {
   card_number: number;
@@ -8,10 +7,10 @@ type PreviewCard = {
   grid: BingoCardCell[];
 };
 
-type CardRow = {
-  id: number;
+type RoundCardRow = {
   card_number: number;
   card_identifier: string;
+  has_free_space: boolean;
   grid: unknown;
 };
 
@@ -20,40 +19,59 @@ type SessionCallRow = {
   ball_number: number | null;
 };
 
-type SessionRow = {
-  id: number;
-  card_label_mode: string;
-  active_playlist_letter_by_round: { round: number; letter: string }[] | null;
-};
-
 /**
- * Builds a read-only preview of a round's card labels by remapping the session's one physical
- * card set (bingo_cards) onto that round's precomputed call order (bingo_session_game_playlists),
- * via each cell's stable ball_number identity. Does not read/write bingo_session_calls' live state
- * and never mutates any row — safe to call for any round at any time, regardless of which round is
- * currently active in the live game.
+ * Fixed Crates mode: returns that round's own independently-generated card set
+ * (bingo_session_round_cards), built once at session creation — not a relabeled
+ * copy of another round's cards. Safe to call for any round at any time, regardless
+ * of which round is currently active in the live game; purely a read.
  */
-export async function buildRoundCardPreview(
+export async function getRoundCardPreview(
   db: BingoDbClient,
   sessionId: number,
   roundNumber: number
 ): Promise<PreviewCard[]> {
-  const { data: session, error: sessionError } = await db
-    .from("bingo_sessions")
-    .select("id, card_label_mode, active_playlist_letter_by_round")
-    .eq("id", sessionId)
-    .maybeSingle();
-  if (sessionError) throw new Error(sessionError.message);
-  if (!session) throw new Error("Session not found");
-  const typedSession = session as unknown as SessionRow;
-  const labelMode = (typedSession.card_label_mode ?? "track_artist") as "track_artist" | "track_only";
-
-  const { data: cards, error: cardsError } = await db
-    .from("bingo_cards")
-    .select("id, card_number, card_identifier, grid")
+  const { data: cards, error } = await db
+    .from("bingo_session_round_cards")
+    .select("card_number, card_identifier, has_free_space, grid")
     .eq("session_id", sessionId)
+    .eq("round_number", roundNumber)
     .order("card_number", { ascending: true });
-  if (cardsError) throw new Error(cardsError.message);
+  if (error) throw new Error(error.message);
+
+  if (!cards || cards.length === 0) {
+    throw new Error(`No cards found for round ${roundNumber}. Has the session finished creating?`);
+  }
+
+  return (cards as unknown as RoundCardRow[]).map((row) => ({
+    card_number: row.card_number,
+    card_identifier: row.card_identifier,
+    grid: (Array.isArray(row.grid) ? row.grid : []) as BingoCardCell[],
+  }));
+}
+
+/**
+ * Fixed Crates mode: copies a round's precomputed card set (bingo_session_round_cards)
+ * into the live bingo_cards table, resolving each cell's call_id from the CURRENT
+ * bingo_session_calls rows for that round (which activate-round must have already
+ * refreshed before calling this). This is what makes the cards printed in advance
+ * match what the live game actually shows/validates against.
+ *
+ * No-op if this round has no precomputed cards (e.g. Shared Pool sessions, where
+ * bingo_session_round_cards is never populated), so it is safe to call unconditionally.
+ */
+export async function syncRoundCardsToLive(
+  db: BingoDbClient,
+  sessionId: number,
+  roundNumber: number
+): Promise<void> {
+  const { data: roundCards, error: roundCardsError } = await db
+    .from("bingo_session_round_cards")
+    .select("card_number, card_identifier, has_free_space, grid")
+    .eq("session_id", sessionId)
+    .eq("round_number", roundNumber)
+    .order("card_number", { ascending: true });
+  if (roundCardsError) throw new Error(roundCardsError.message);
+  if (!roundCards || roundCards.length === 0) return;
 
   const { data: calls, error: callsError } = await db
     .from("bingo_session_calls")
@@ -61,50 +79,30 @@ export async function buildRoundCardPreview(
     .eq("session_id", sessionId);
   if (callsError) throw new Error(callsError.message);
 
-  const callIdToBallNumber = new Map<number, number>(
+  const ballNumberToCallId = new Map<number, number>(
     ((calls ?? []) as SessionCallRow[])
       .filter((call): call is SessionCallRow & { ball_number: number } => call.ball_number !== null)
-      .map((call) => [call.id, call.ball_number])
+      .map((call) => [call.ball_number, call.id])
   );
 
-  const activeLetter = (typedSession.active_playlist_letter_by_round ?? []).find(
-    (entry) => entry.round === roundNumber
-  )?.letter;
+  const { error: deleteError } = await db.from("bingo_cards").delete().eq("session_id", sessionId);
+  if (deleteError) throw new Error(deleteError.message);
 
-  const roundPlaylist = activeLetter
-    ? await getPlaylistByLetter(db, sessionId, activeLetter)
-    : (await getPlaylistsForRound(db, sessionId, roundNumber))[0] ?? null;
-
-  if (!roundPlaylist) {
-    throw new Error(`No game playlist found for round ${roundNumber}. Has the session finished creating?`);
-  }
-
-  const ballNumberToTrack = new Map<number, { track_title: string; artist_name: string }>(
-    roundPlaylist.call_order
-      .filter((entry) => entry.ball_number !== null)
-      .map((entry) => [entry.ball_number as number, { track_title: entry.track_title, artist_name: entry.artist_name }])
-  );
-
-  return ((cards ?? []) as unknown as CardRow[]).map((card) => {
-    const grid = (Array.isArray(card.grid) ? card.grid : []) as BingoCardCell[];
+  const liveRows = (roundCards as unknown as RoundCardRow[]).map((row) => {
+    const grid = (Array.isArray(row.grid) ? row.grid : []) as BingoCardCell[];
     return {
-      card_number: card.card_number,
-      card_identifier: card.card_identifier,
-      grid: grid.map((cell) => {
-        if (cell.free || cell.call_id === null) return cell;
-
-        const ballNumber = callIdToBallNumber.get(cell.call_id);
-        const track = ballNumber !== undefined ? ballNumberToTrack.get(ballNumber) : undefined;
-        if (!track) return cell;
-
-        const label = labelMode === "track_only" ? track.track_title : `${track.track_title} - ${track.artist_name}`;
-        return {
-          ...cell,
-          track_title: track.track_title,
-          artist_name: track.artist_name,
-          label,
-        };
-      }),
+      session_id: sessionId,
+      card_number: row.card_number,
+      card_identifier: row.card_identifier,
+      has_free_space: row.has_free_space,
+      grid: grid.map((cell) =>
+        cell.free || cell.ball_number == null
+          ? cell
+          : { ...cell, call_id: ballNumberToCallId.get(cell.ball_number) ?? null }
+      ),
     };
   });
+
+  const { error: insertError } = await db.from("bingo_cards").insert(liveRows);
+  if (insertError) throw new Error(insertError.message);
 }

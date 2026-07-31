@@ -666,6 +666,39 @@ export type BingoDatabase = {
         };
         Relationships: [];
       };
+      bingo_session_round_cards: {
+        Row: {
+          id: number;
+          session_id: number;
+          round_number: number;
+          card_number: number;
+          card_identifier: string;
+          has_free_space: boolean;
+          grid: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          session_id: number;
+          round_number: number;
+          card_number: number;
+          card_identifier: string;
+          has_free_space?: boolean;
+          grid: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          session_id?: number;
+          round_number?: number;
+          card_number?: number;
+          card_identifier?: string;
+          has_free_space?: boolean;
+          grid?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       bingo_session_events: {
         Row: {
           id: number;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBingoDb } from "src/lib/bingoDb";
-import { buildRoundCardPreview } from "src/lib/bingoCratePrint";
+import { getRoundCardPreview } from "src/lib/bingoCratePrint";
 
 export const runtime = "nodejs";
 
@@ -21,7 +21,7 @@ export async function GET(
 
   const db = getBingoDb();
   try {
-    const data = await buildRoundCardPreview(db, sessionId, Math.floor(roundNumber));
+    const data = await getRoundCardPreview(db, sessionId, Math.floor(roundNumber));
     return NextResponse.json({ data }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to build round card preview";

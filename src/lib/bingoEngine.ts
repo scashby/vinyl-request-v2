@@ -75,6 +75,10 @@ export type BingoCardCell = {
   track_title: string;
   artist_name: string;
   label: string;
+  // Populated for Fixed Crates round-card generation (bingo_session_round_cards),
+  // where no bingo_session_calls row/call_id exists yet for non-active rounds.
+  // Used to resolve call_id via ball_number when a round is copied into bingo_cards.
+  ball_number?: number | null;
 };
 
 type DbPlaylistItem = {
@@ -183,7 +187,7 @@ export function computeMinimumPlaylistTracks(roundCount: number, cardCount: numb
   return GAME_BALL_COUNT;
 }
 
-type PlannedSessionCall = {
+export type PlannedSessionCall = {
   playlist_track_key: string;
   call_index: number;
   ball_number: number;
@@ -333,6 +337,109 @@ export function planRoundSessionCalls(
   return orderedSlots.map((entry, drawIndex) => ({
     playlist_track_key: entry.track.trackKey,
     call_index: drawIndex + 1,
+    ball_number: entry.ballNumber,
+    column_letter: entry.columnLetter,
+    track_title: entry.track.trackTitle,
+    artist_name: entry.track.artistName,
+    album_name: entry.track.albumName,
+    side: entry.track.side,
+    position: entry.track.position,
+    link_group: entry.track.linkGroup ?? null,
+    theme_hint: entry.track.themeHint ?? null,
+  }));
+}
+
+export function buildOrderPreservingRoundPool(tracks: ResolvedPlaylistTrack[]): ResolvedPlaylistTrack[] {
+  return [...tracks]
+    .sort((left, right) => (left.sortOrder ?? Number.MAX_SAFE_INTEGER) - (right.sortOrder ?? Number.MAX_SAFE_INTEGER))
+    .slice(0, GAME_BALL_COUNT);
+}
+
+type BallAssignment = { track: ResolvedPlaylistTrack; ballNumber: number; columnLetter: BingoColumn };
+
+// Adapted from enforceColumnLinks: that helper swaps ARRAY POSITIONS (which double as
+// column identity when ball_number == position+1). Here, ball_number is an independent
+// random permutation, so linked tracks are forced into the same column by swapping their
+// ball_number/columnLetter with an unlinked track already in the target column, leaving
+// each entry's position (== call order) untouched.
+function enforceColumnLinksForBallAssignment(assignments: BallAssignment[]): BallAssignment[] {
+  const result = assignments.map((entry) => ({ ...entry }));
+
+  const groups = new Map<string, number[]>(); // linkGroup -> indices (playlist positions) in result
+  for (let i = 0; i < result.length; i++) {
+    const lg = result[i].track.linkGroup;
+    if (!lg) continue;
+    if (!groups.has(lg)) groups.set(lg, []);
+    groups.get(lg)!.push(i);
+  }
+
+  for (const [, indices] of groups) {
+    if (indices.length < 2) continue;
+
+    const targetColIdx = Math.floor((result[indices[0]].ballNumber - 1) / 15);
+    const targetStart = targetColIdx * 15 + 1;
+    const targetEnd = targetStart + 15;
+
+    const availableInTarget: number[] = [];
+    for (let j = 0; j < result.length; j++) {
+      if (indices.includes(j)) continue;
+      if (result[j].ballNumber >= targetStart && result[j].ballNumber < targetEnd) {
+        availableInTarget.push(j);
+      }
+    }
+
+    for (const idx of indices) {
+      const col = Math.floor((result[idx].ballNumber - 1) / 15);
+      if (col === targetColIdx) continue;
+      const swapIdx = availableInTarget.shift();
+      if (swapIdx === undefined) break; // no room left in target column — skip gracefully
+
+      const tempBall = result[idx].ballNumber;
+      const tempCol = result[idx].columnLetter;
+      result[idx].ballNumber = result[swapIdx].ballNumber;
+      result[idx].columnLetter = result[swapIdx].columnLetter;
+      result[swapIdx].ballNumber = tempBall;
+      result[swapIdx].columnLetter = tempCol;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Fixed Crates mode: the crate's playlist order IS the call order (no reshuffling —
+ * track 1 in the playlist is called first, track 2 second, etc.), while the bingo
+ * slot (ball_number/column) each track occupies is an independent random permutation,
+ * seeded per session+round so it's reproducible but not tied to playlist position.
+ */
+export function planFixedCrateRoundCalls(
+  tracks: ResolvedPlaylistTrack[],
+  sessionId: number,
+  roundNumber: number
+): PlannedSessionCall[] {
+  const orderedTracks = buildOrderPreservingRoundPool(tracks);
+  if (orderedTracks.length < GAME_BALL_COUNT) {
+    throw new Error(`Playlist must contain at least ${GAME_BALL_COUNT} tracks to build a bingo crate.`);
+  }
+
+  const slotSeed = `session:${sessionId}:round:${roundNumber}:slot-assignment:v1`;
+  const ballNumbers = stableRoundSort(
+    Array.from({ length: GAME_BALL_COUNT }, (_, i) => i + 1),
+    slotSeed,
+    (n) => String(n)
+  );
+
+  const rawAssignments: BallAssignment[] = orderedTracks.map((track, index) => ({
+    track,
+    ballNumber: ballNumbers[index],
+    columnLetter: getColumnLetterForBallNumber(ballNumbers[index]),
+  }));
+
+  const assignments = enforceColumnLinksForBallAssignment(rawAssignments);
+
+  return assignments.map((entry, index) => ({
+    playlist_track_key: entry.track.trackKey,
+    call_index: index + 1,
     ball_number: entry.ballNumber,
     column_letter: entry.columnLetter,
     track_title: entry.track.trackTitle,
@@ -1137,6 +1244,20 @@ function buildCardSignature(grid: BingoCardCell[]): string {
     .join("|");
 }
 
+// Round-card cells have no call_id yet (see buildFixedCrateCardRows), so uniqueness
+// must key on ball_number instead — otherwise every cell would collapse to the same
+// "column:0" key and every generated card would appear identical.
+function buildRoundCardSignature(grid: BingoCardCell[]): string {
+  return grid
+    .filter((cell) => !cell.free)
+    .sort((a, b) => {
+      if (a.row !== b.row) return a.row - b.row;
+      return a.col - b.col;
+    })
+    .map((cell) => `${cell.column_letter}:${cell.ball_number ?? 0}`)
+    .join("|");
+}
+
 function coerceStoredCardSignature(grid: unknown): string | null {
   if (!Array.isArray(grid)) return null;
 
@@ -1311,6 +1432,137 @@ export async function generateCardRows(
 
     cards.push({
       session_id: sessionId,
+      card_number: cardNum,
+      card_identifier: buildCardIdentifier(sessionCode, cardNum),
+      has_free_space: true,
+      grid,
+    });
+  }
+
+  return cards;
+}
+
+export type GeneratedRoundCardRow = {
+  round_number: number;
+  card_number: number;
+  card_identifier: string;
+  has_free_space: boolean;
+  grid: BingoCardCell[];
+};
+
+/**
+ * Fixed Crates mode: builds a full, independently-random card set for one round from
+ * in-memory planned calls (no bingo_session_calls query — most rounds aren't the live
+ * round yet, so no such rows exist). Cells carry ball_number instead of call_id; call_id
+ * gets resolved when this round is later copied into bingo_cards for live play.
+ */
+export function buildFixedCrateCardRows(
+  plannedCalls: PlannedSessionCall[],
+  roundNumber: number,
+  cardCount: number,
+  labelMode: "track_artist" | "track_only",
+  sessionCode: string,
+  startCardNumber = 1
+): GeneratedRoundCardRow[] {
+  const byColumn = {
+    B: plannedCalls.filter((c) => c.column_letter === "B"),
+    I: plannedCalls.filter((c) => c.column_letter === "I"),
+    N: plannedCalls.filter((c) => c.column_letter === "N"),
+    G: plannedCalls.filter((c) => c.column_letter === "G"),
+    O: plannedCalls.filter((c) => c.column_letter === "O"),
+  };
+
+  const cards: GeneratedRoundCardRow[] = [];
+  const signatures = new Set<string>();
+  const normalizedStart = Math.max(1, Math.floor(startCardNumber));
+
+  function pickFive(calls: PlannedSessionCall[]): PlannedSessionCall[] {
+    const shuffled = shuffle(calls);
+    const picked: PlannedSessionCall[] = [];
+    const usedGroups = new Set<string>();
+    for (const call of shuffled) {
+      if (picked.length >= 5) break;
+      if (call.link_group && usedGroups.has(call.link_group)) continue;
+      picked.push(call);
+      if (call.link_group) usedGroups.add(call.link_group);
+    }
+    for (const call of shuffled) {
+      if (picked.length >= 5) break;
+      if (!picked.includes(call)) picked.push(call);
+    }
+    return picked;
+  }
+
+  function buildCardGrid(): BingoCardCell[] {
+    const picked = {
+      B: pickFive(byColumn.B),
+      I: pickFive(byColumn.I),
+      N: pickFive(byColumn.N),
+      G: pickFive(byColumn.G),
+      O: pickFive(byColumn.O),
+    };
+
+    const grid: BingoCardCell[] = [];
+    for (let row = 0; row < 5; row += 1) {
+      for (let col = 0; col < 5; col += 1) {
+        const letter = BINGO_COLUMNS[col];
+        if (row === 2 && col === 2) {
+          grid.push({
+            row,
+            col,
+            free: true,
+            column_letter: "N",
+            call_id: null,
+            track_title: "FREE",
+            artist_name: "",
+            label: "FREE",
+            ball_number: null,
+          });
+          continue;
+        }
+
+        const source = picked[letter][row] ?? shuffle(byColumn[letter])[0];
+        const label = labelMode === "track_only" ? source.track_title : `${source.track_title} - ${source.artist_name}`;
+        grid.push({
+          row,
+          col,
+          free: false,
+          column_letter: getColumnLetterForBallNumber(source.ball_number),
+          call_id: null,
+          track_title: source.track_title,
+          artist_name: source.artist_name,
+          label,
+          ball_number: source.ball_number,
+        });
+      }
+    }
+
+    return grid;
+  }
+
+  for (let cardOffset = 0; cardOffset < cardCount; cardOffset += 1) {
+    const cardNum = normalizedStart + cardOffset;
+    let grid: BingoCardCell[] = [];
+    let signature = "";
+    let generatedUnique = false;
+
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      grid = buildCardGrid();
+      signature = buildRoundCardSignature(grid);
+      if (!signatures.has(signature)) {
+        generatedUnique = true;
+        break;
+      }
+    }
+
+    if (!generatedUnique) {
+      throw new Error("Unable to generate enough unique bingo cards for this round. Increase playlist size or reduce card count.");
+    }
+
+    signatures.add(signature);
+
+    cards.push({
+      round_number: roundNumber,
       card_number: cardNum,
       card_identifier: buildCardIdentifier(sessionCode, cardNum),
       has_free_space: true,
