@@ -98,6 +98,7 @@ type UnmatchedTrack = {
   row_id: string;
   title?: string;
   artist?: string;
+  album?: string;
   candidates: MatchCandidate[];
 };
 
@@ -513,6 +514,9 @@ export function PlaylistStudioModal({
   const [browseUnmatchedResults, setBrowseUnmatchedResults] = useState<MatchCandidate[]>([]);
   const [browseUnmatchedSearching, setBrowseUnmatchedSearching] = useState(false);
   const [retryingUnmatched, setRetryingUnmatched] = useState(false);
+  const [customTrackRowId, setCustomTrackRowId] = useState<string | null>(null);
+  const [customTrackDraftByRow, setCustomTrackDraftByRow] = useState<Record<string, { title: string; artist: string; album: string }>>({});
+  const [savingCustomTrackRowId, setSavingCustomTrackRowId] = useState<string | null>(null);
   const wasOpenRef = useRef(false);
   const unmatchedSectionRef = useRef<HTMLDivElement | null>(null);
   const AUTH_RETURN_MODAL_KEY = 'edit-collection-auth-return-modal';
@@ -704,6 +708,7 @@ export function PlaylistStudioModal({
       row_id: `${base}-${index}`,
       title: typeof row.title === 'string' ? row.title : undefined,
       artist: typeof row.artist === 'string' ? row.artist : undefined,
+      album: typeof row.album === 'string' ? row.album : undefined,
       candidates: Array.isArray(row.candidates)
         ? (row.candidates as MatchCandidate[]).filter((candidate) => String(candidate?.track_key ?? '').trim().length > 0)
         : [],
@@ -1706,6 +1711,64 @@ export function PlaylistStudioModal({
       setError(resolveError instanceof Error ? resolveError.message : 'Failed to add match');
     } finally {
       setResolvingTrackKey(null);
+    }
+  };
+
+  const addCustomTrack = async (row: UnmatchedTrack) => {
+    if (!lastImportedPlaylistId) return;
+
+    const draft = customTrackDraftByRow[row.row_id];
+    const title = (draft?.title ?? row.title ?? '').trim();
+    if (!title) return;
+    const artist = (draft?.artist ?? row.artist ?? '').trim();
+    const album = (draft?.album ?? row.album ?? '').trim();
+
+    setSavingCustomTrackRowId(row.row_id);
+    setError(null);
+
+    try {
+      const headers = await getSupabaseAuthHeaders();
+      const res = await fetch('/api/spotify/import/custom-track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          playlistId: lastImportedPlaylistId,
+          title,
+          artist: artist || undefined,
+          album: album || undefined,
+          sourceTitle: row.title,
+          sourceArtist: row.artist,
+        }),
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(formatApiError(payload, res));
+      }
+
+      setUnmatchedRows((prev) => prev.filter((item) => item.row_id !== row.row_id));
+      setUnmatchedQueryByRow((prev) => {
+        const next = { ...prev };
+        delete next[row.row_id];
+        return next;
+      });
+      setUnmatchedSearchByRow((prev) => {
+        const next = { ...prev };
+        delete next[row.row_id];
+        return next;
+      });
+      setCustomTrackDraftByRow((prev) => {
+        const next = { ...prev };
+        delete next[row.row_id];
+        return next;
+      });
+      setCustomTrackRowId((current) => (current === row.row_id ? null : current));
+      setBrowseUnmatchedRow((current) => (current?.row_id === row.row_id ? null : current));
+      await onImported();
+    } catch (customTrackError) {
+      setError(customTrackError instanceof Error ? customTrackError.message : 'Failed to add custom track');
+    } finally {
+      setSavingCustomTrackRowId(null);
     }
   };
 
@@ -2858,7 +2921,84 @@ export function PlaylistStudioModal({
                               >
                                 Browse
                               </button>
+                              <button
+                                onClick={() =>
+                                  setCustomTrackRowId((current) => {
+                                    const next = current === row.row_id ? null : row.row_id;
+                                    if (next) {
+                                      setCustomTrackDraftByRow((prev) => ({
+                                        ...prev,
+                                        [row.row_id]: prev[row.row_id] ?? {
+                                          title: row.title ?? '',
+                                          artist: row.artist ?? '',
+                                          album: row.album ?? '',
+                                        },
+                                      }));
+                                    }
+                                    return next;
+                                  })
+                                }
+                                className="shrink-0 rounded-md border border-violet-400 bg-violet-900/50 px-2 py-1 text-xs font-semibold text-violet-100 hover:bg-violet-900/70"
+                              >
+                                Add as Custom
+                              </button>
                             </div>
+
+                            {customTrackRowId === row.row_id && (
+                              <div className="mt-2 space-y-1.5 rounded-md border border-violet-400/40 bg-violet-950/20 p-2">
+                                <div className="text-[11px] text-violet-100/80">
+                                  Not an official release (e.g. a custom mix track) - add it as its own entry.
+                                </div>
+                                <input
+                                  value={customTrackDraftByRow[row.row_id]?.title ?? ''}
+                                  onChange={(event) =>
+                                    setCustomTrackDraftByRow((prev) => ({
+                                      ...prev,
+                                      [row.row_id]: { ...prev[row.row_id], title: event.target.value, artist: prev[row.row_id]?.artist ?? '', album: prev[row.row_id]?.album ?? '' },
+                                    }))
+                                  }
+                                  placeholder="Title"
+                                  className="w-full rounded-md border border-violet-300/30 bg-violet-950/30 px-2.5 py-1.5 text-xs text-violet-50 outline-none focus:border-violet-300/60"
+                                />
+                                <input
+                                  value={customTrackDraftByRow[row.row_id]?.artist ?? ''}
+                                  onChange={(event) =>
+                                    setCustomTrackDraftByRow((prev) => ({
+                                      ...prev,
+                                      [row.row_id]: { ...prev[row.row_id], artist: event.target.value, title: prev[row.row_id]?.title ?? '', album: prev[row.row_id]?.album ?? '' },
+                                    }))
+                                  }
+                                  placeholder="Artist"
+                                  className="w-full rounded-md border border-violet-300/30 bg-violet-950/30 px-2.5 py-1.5 text-xs text-violet-50 outline-none focus:border-violet-300/60"
+                                />
+                                <input
+                                  value={customTrackDraftByRow[row.row_id]?.album ?? ''}
+                                  onChange={(event) =>
+                                    setCustomTrackDraftByRow((prev) => ({
+                                      ...prev,
+                                      [row.row_id]: { ...prev[row.row_id], album: event.target.value, title: prev[row.row_id]?.title ?? '', artist: prev[row.row_id]?.artist ?? '' },
+                                    }))
+                                  }
+                                  placeholder="Mix / album name (optional - groups tracks together)"
+                                  className="w-full rounded-md border border-violet-300/30 bg-violet-950/30 px-2.5 py-1.5 text-xs text-violet-50 outline-none focus:border-violet-300/60"
+                                />
+                                <button
+                                  onClick={() => void addCustomTrack(row)}
+                                  disabled={
+                                    savingCustomTrackRowId === row.row_id ||
+                                    !(customTrackDraftByRow[row.row_id]?.title ?? '').trim()
+                                  }
+                                  className={`w-full rounded-md border px-2 py-1.5 text-xs font-semibold ${
+                                    savingCustomTrackRowId === row.row_id ||
+                                    !(customTrackDraftByRow[row.row_id]?.title ?? '').trim()
+                                      ? 'cursor-not-allowed border-[#3d4a65] bg-[#1f2a41] text-[#8094b9]'
+                                      : 'border-violet-400 bg-violet-800 text-white hover:bg-violet-700'
+                                  }`}
+                                >
+                                  {savingCustomTrackRowId === row.row_id ? 'Saving...' : 'Save Custom Track'}
+                                </button>
+                              </div>
+                            )}
 
                             {(unmatchedSearchByRow[row.row_id] ?? []).length > 0 && (
                               <div className="mt-2 space-y-1">

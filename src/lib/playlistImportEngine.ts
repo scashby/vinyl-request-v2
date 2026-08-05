@@ -37,6 +37,7 @@ export type MatchCandidate = {
 export type MissingRow = {
   title?: string;
   artist?: string;
+  album?: string;
   candidates: MatchCandidate[];
 };
 
@@ -987,6 +988,7 @@ const matchRows = async (
     missing.push({
       title: rawTitle || undefined,
       artist: rawArtist || undefined,
+      album: rawAlbum || undefined,
       candidates: mergedCandidates,
     });
   }
