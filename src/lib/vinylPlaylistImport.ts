@@ -602,16 +602,23 @@ export const fetchInventoryTracks = async (
     const releaseTitleById = new Map<number, string>();
     const releaseMediaTypeById = new Map<number, string>();
     const releaseFormatDetailsById = new Map<number, string[]>();
+    // Custom tracks (one-off adds not backed by a real release, e.g. from
+    // "Add Custom Track" during import) should not become standing match
+    // candidates for unrelated future imports, so anything flagged is_custom
+    // is dropped from the chunk before fetching its tracks below.
+    const nonCustomReleaseIds: number[] = [];
     {
       const { data: releases, error: releaseError } = await supabase
         .from("releases")
-        .select("id, media_type, format_details, master:masters(title, artist:artists(name))")
-        .in("id", chunk);
+        .select("id, media_type, format_details, is_custom, master:masters(title, artist:artists(name))")
+        .in("id", chunk)
+        .eq("is_custom", false);
       if (releaseError) {
         throw new Error(`Failed loading release artists: ${releaseError.message}`);
       }
       for (const row of releases ?? []) {
         const releaseId = typeof row.id === "number" ? row.id : null;
+        if (releaseId) nonCustomReleaseIds.push(releaseId);
         const master = Array.isArray(row.master) ? row.master[0] : row.master;
         const masterTitle = master && typeof master === "object" ? (master as { title?: unknown }).title : null;
         const artist = master && typeof master === "object" ? (master as { artist?: unknown }).artist : null;
@@ -637,6 +644,8 @@ export const fetchInventoryTracks = async (
       }
     }
 
+    if (nonCustomReleaseIds.length === 0) continue;
+
     let releaseTrackPage = 0;
     while (true) {
       const from = releaseTrackPage * PAGE_SIZE;
@@ -644,7 +653,7 @@ export const fetchInventoryTracks = async (
       const { data: releaseTracks, error: releaseTracksError } = await supabase
         .from("release_tracks")
         .select("id, release_id, position, side, title_override, recordings ( id, title, track_artist )")
-        .in("release_id", chunk)
+        .in("release_id", nonCustomReleaseIds)
         .order("id", { ascending: true })
         .range(from, to);
 
