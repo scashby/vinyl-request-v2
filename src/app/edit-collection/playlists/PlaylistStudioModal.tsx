@@ -283,6 +283,8 @@ type SwapTrackModalState = {
   sourceTrackKey: string;
   sourceTitle: string;
   sourceArtist: string;
+  mode: 'swap' | 'insert-above' | 'insert-below';
+  insertIndex?: number;
 } | null;
 
 type SortableManualTrackRowProps = {
@@ -294,6 +296,7 @@ type SortableManualTrackRowProps = {
   onContextMenu: (e: React.MouseEvent, trackKey: string, index: number) => void;
   onThreeDotClick: (e: React.MouseEvent, trackKey: string, index: number) => void;
   onThemeHintChange: (trackKey: string, value: string) => void;
+  onStartEditingTitle: (trackKey: string) => void;
   isEditingTitle: boolean;
   editingTitleValue: string;
   onEditingTitleValueChange: (value: string) => void;
@@ -310,6 +313,7 @@ function SortableManualTrackRow({
   onContextMenu,
   onThreeDotClick,
   onThemeHintChange,
+  onStartEditingTitle,
   isEditingTitle,
   editingTitleValue,
   onEditingTitleValueChange,
@@ -378,7 +382,14 @@ function SortableManualTrackRow({
                 className="w-full rounded border border-[#4a7fcc] bg-[#0d1a2e] px-2 py-0.5 text-sm font-medium text-white focus:outline-none"
               />
             ) : (
-              <span className="truncate text-sm font-medium text-white">
+              <span
+                className="cursor-text truncate text-sm font-medium text-white hover:text-[#9dc2ff]"
+                title="Click to edit title"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStartEditingTitle(track.track_key);
+                }}
+              >
                 {track.display_title ?? track.track_title ?? track.track_key}
                 {track.display_title && track.display_title !== track.track_title && (
                   <span className="ml-1.5 text-xs font-normal text-[#60a5fa]" title={`Original: ${track.track_title ?? ''}`}>✎</span>
@@ -1109,14 +1120,28 @@ export function PlaylistStudioModal({
   const applySwapTrack = useCallback(async (candidate: InventorySearchCandidate) => {
     if (!swapTrackModal) return;
 
-    if (candidate.track_key === swapTrackModal.sourceTrackKey) {
+    if (swapTrackModal.mode === 'insert-above' || swapTrackModal.mode === 'insert-below') {
+      const insertAt = swapTrackModal.insertIndex ?? 0;
+      setManualTracks((prev) => {
+        const next = [...prev];
+        next.splice(insertAt, 0, {
+          track_key: candidate.track_key,
+          sort_order: insertAt,
+          track_title: candidate.title,
+          display_title: null,
+          artist_name: candidate.artist,
+          album_name: candidate.album_title,
+          side: candidate.side,
+          position: candidate.position,
+          link_group: null,
+          theme_hint: null,
+        });
+        return next.map((track, idx) => ({ ...track, sort_order: idx }));
+      });
+      setNotice(`Inserted "${candidate.title}" by ${candidate.artist}`);
       setSwapTrackModal(null);
-      return;
-    }
-
-    const duplicate = manualTracks.some((track) => track.track_key === candidate.track_key);
-    if (duplicate) {
-      setError('That destination track is already in this playlist.');
+      setSwapTrackQuery('');
+      setSwapTrackResults([]);
       return;
     }
 
@@ -2225,6 +2250,7 @@ export function PlaylistStudioModal({
                                 onContextMenu={openTrackContextMenu}
                                 onThreeDotClick={openTrackThreeDot}
                                 onThemeHintChange={handleThemeHintChange}
+                                onStartEditingTitle={startEditingTitle}
                                 isEditingTitle={editingTitleKey === track.track_key}
                                 editingTitleValue={editingTitleValue}
                                 onEditingTitleValueChange={setEditingTitleValue}
@@ -3388,6 +3414,7 @@ export function PlaylistStudioModal({
                     sourceTrackKey: contextMenu.trackKey,
                     sourceTitle: source?.track_title ?? source?.display_title ?? contextMenu.trackKey,
                     sourceArtist: source?.artist_name ?? '',
+                    mode: 'swap',
                   });
                   setSwapTrackQuery('');
                   setSwapTrackResults([]);
@@ -3395,6 +3422,42 @@ export function PlaylistStudioModal({
                 }}
               >
                 Swap track…
+              </button>
+              <button
+                className="w-full px-4 py-2 text-left text-sm text-[#a7f3d0] hover:bg-[#1e3050]"
+                onClick={() => {
+                  const source = manualTracks.find((t) => t.track_key === contextMenu.trackKey);
+                  setSwapTrackModal({
+                    sourceTrackKey: contextMenu.trackKey,
+                    sourceTitle: source?.track_title ?? source?.display_title ?? contextMenu.trackKey,
+                    sourceArtist: source?.artist_name ?? '',
+                    mode: 'insert-above',
+                    insertIndex: contextMenu.index,
+                  });
+                  setSwapTrackQuery('');
+                  setSwapTrackResults([]);
+                  setContextMenu(null);
+                }}
+              >
+                Insert track above…
+              </button>
+              <button
+                className="w-full px-4 py-2 text-left text-sm text-[#a7f3d0] hover:bg-[#1e3050]"
+                onClick={() => {
+                  const source = manualTracks.find((t) => t.track_key === contextMenu.trackKey);
+                  setSwapTrackModal({
+                    sourceTrackKey: contextMenu.trackKey,
+                    sourceTitle: source?.track_title ?? source?.display_title ?? contextMenu.trackKey,
+                    sourceArtist: source?.artist_name ?? '',
+                    mode: 'insert-below',
+                    insertIndex: contextMenu.index + 1,
+                  });
+                  setSwapTrackQuery('');
+                  setSwapTrackResults([]);
+                  setContextMenu(null);
+                }}
+              >
+                Insert track below…
               </button>
               {manualTracks.find((t) => t.track_key === contextMenu.trackKey)?.display_title && (
                 <button
@@ -3463,9 +3526,16 @@ export function PlaylistStudioModal({
             >
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-[#8faddd]">Swap Playlist Track</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#8faddd]">
+                    {swapTrackModal.mode === 'swap' ? 'Swap Playlist Track' : 'Insert Playlist Track'}
+                  </p>
                   <p className="mt-1 text-sm text-white">
-                    Replacing: <span className="font-semibold">{swapTrackModal.sourceTitle}</span>
+                    {swapTrackModal.mode === 'swap'
+                      ? 'Replacing: '
+                      : swapTrackModal.mode === 'insert-above'
+                        ? 'Insert above: '
+                        : 'Insert below: '}
+                    <span className="font-semibold">{swapTrackModal.sourceTitle}</span>
                     {swapTrackModal.sourceArtist ? ` - ${swapTrackModal.sourceArtist}` : ''}
                   </p>
                 </div>
@@ -3523,6 +3593,7 @@ export function PlaylistStudioModal({
                           <div className="min-w-0">
                             <div className="truncate text-sm font-medium text-white">
                               {candidate.title} - {candidate.artist}
+                              {isCurrent && <span className="ml-1.5 text-xs font-normal text-[#8094b9]">(current)</span>}
                             </div>
                             <div className="truncate text-xs text-[#9db5de]">
                               {meta.join(' • ')}
@@ -3531,15 +3602,15 @@ export function PlaylistStudioModal({
                             </div>
                           </div>
                           <button
-                            disabled={swapTrackApplying || isCurrent}
+                            disabled={swapTrackApplying}
                             onClick={() => applySwapTrack(candidate)}
                             className={`shrink-0 rounded-md border px-2 py-1 text-xs font-semibold ${
-                              swapTrackApplying || isCurrent
+                              swapTrackApplying
                                 ? 'cursor-not-allowed border-[#3d4a65] bg-[#1f2a41] text-[#8094b9]'
                                 : 'border-[#4cab73] bg-[#1f6d42] text-white hover:bg-[#298f57]'
                             }`}
                           >
-                            {isCurrent ? 'Current' : 'Swap'}
+                            {swapTrackModal.mode === 'swap' ? 'Swap' : 'Insert'}
                           </button>
                         </div>
                       );

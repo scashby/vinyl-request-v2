@@ -100,9 +100,6 @@ export async function propagatePlaylistTrackSwap(input: SwapInput): Promise<Play
   if (!oldTrackKey || !newTrackKey) {
     throw new Error("Both fromTrackKey and toTrackKey are required");
   }
-  if (oldTrackKey === newTrackKey) {
-    throw new Error("Source and destination track keys are identical");
-  }
 
   const db = getBingoDb();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -136,26 +133,6 @@ export async function propagatePlaylistTrackSwap(input: SwapInput): Promise<Play
     }
   }
   const affectedPlaylistIdList = Array.from(affectedPlaylistIds);
-
-  const { data: playlistConflicts, error: playlistConflictError } = await dbAny
-    .from("collection_playlist_items")
-    .select("playlist_id, track_key")
-    .in("playlist_id", affectedPlaylistIdList)
-    .in("track_key", [oldTrackKey, newTrackKey]);
-  if (playlistConflictError) throw new Error(playlistConflictError.message);
-
-  const byPlaylist = new Map<number, Set<string>>();
-  for (const row of (playlistConflicts ?? []) as Array<{ playlist_id: number; track_key: string }>) {
-    if (!byPlaylist.has(row.playlist_id)) byPlaylist.set(row.playlist_id, new Set());
-    byPlaylist.get(row.playlist_id)?.add(row.track_key);
-  }
-
-  const conflicts = Array.from(byPlaylist.entries())
-    .filter(([, keys]) => keys.has(oldTrackKey) && keys.has(newTrackKey))
-    .map(([id]) => id);
-  if (conflicts.length > 0) {
-    throw new Error(`Swap aborted: destination track already exists in playlist(s): ${conflicts.join(", ")}`);
-  }
 
   const { data: playlistRows, error: playlistRowError } = await dbAny
     .from("collection_playlist_items")
