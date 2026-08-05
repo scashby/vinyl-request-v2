@@ -88,8 +88,14 @@ const getCacheKeyForAuthHeader = (authHeader?: string) => {
   return "auth:unknown";
 };
 
+// Fold accented Latin letters (Björk, Mötley Crüe, Beyoncé, ...) to their base
+// form before stripping non-ASCII characters. Without this, the [^a-z0-9] strip
+// below treats the accented letter as a separator (e.g. "björk" -> "bj rk"),
+// shredding the name into short fragments that can fuzzy-match unrelated tracks.
+const foldDiacritics = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, "");
+
 const normalizeTitleValue = (value: string) =>
-  value
+  foldDiacritics(value)
     .toLowerCase()
     .replace(/["'`]/g, "")
     .replace(/\([^)]*\)/g, "")
@@ -98,7 +104,7 @@ const normalizeTitleValue = (value: string) =>
     .trim();
 
 const normalizeArtistValue = (value: string) =>
-  stripDiscogsDisambiguationSuffix(value)
+  foldDiacritics(stripDiscogsDisambiguationSuffix(value))
     .toLowerCase()
     .replace(/["'`]/g, "")
     .replace(/\[[^\]]*\]/g, "")
