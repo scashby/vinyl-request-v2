@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthHeader } from "src/lib/supabaseServer";
-import { importRowsToPlaylist, parseCsvRows, type ImportMatchFilters, type MatchingMode } from "src/lib/playlistImportEngine";
+import { importRowsToPlaylist, parseCsvRows, type ImportMatchFilters, type MatchingMode, type SourceRow } from "src/lib/playlistImportEngine";
 
 export const runtime = "nodejs";
 
@@ -9,6 +9,27 @@ const parseStringArray = (value: unknown) => {
   return value
     .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
     .filter((entry) => entry.length > 0);
+};
+
+// Structured rows (used by "Retry Matching" on unmatched import rows) carry a
+// reservedSortOrder so a track that matches on retry lands back in its
+// original playlist position instead of being appended to the end.
+const parseStructuredRows = (value: unknown): SourceRow[] | null => {
+  if (!Array.isArray(value)) return null;
+  const rows: SourceRow[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue;
+    const record = entry as Record<string, unknown>;
+    const title = typeof record.title === "string" ? record.title.trim() : "";
+    if (!title) continue;
+    rows.push({
+      title,
+      artist: typeof record.artist === "string" ? record.artist.trim() || undefined : undefined,
+      album: typeof record.album === "string" ? record.album.trim() || undefined : undefined,
+      reservedSortOrder: Number.isFinite(record.reservedSortOrder) ? Number(record.reservedSortOrder) : undefined,
+    });
+  }
+  return rows;
 };
 
 export async function POST(req: Request) {
@@ -33,14 +54,15 @@ export async function POST(req: Request) {
       formatDetails: parseStringArray(body?.matchFilters?.formatDetails),
     };
 
-    if (!csvText) {
+    step = "parse-rows";
+    const structuredRows = parseStructuredRows(body?.rows);
+    const rows = structuredRows ?? parseCsvRows(csvText);
+
+    if (!structuredRows && !csvText) {
       return NextResponse.json({ error: "csvText is required" }, { status: 400 });
     }
-
-    step = "parse-csv";
-    const rows = parseCsvRows(csvText);
     if (rows.length === 0) {
-      return NextResponse.json({ error: "No valid rows found in CSV" }, { status: 400 });
+      return NextResponse.json({ error: "No valid rows found" }, { status: 400 });
     }
 
     step = "import";

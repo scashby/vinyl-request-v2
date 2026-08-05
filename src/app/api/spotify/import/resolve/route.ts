@@ -10,6 +10,7 @@ export async function POST(req: Request) {
     const trackKey = String(body?.trackKey ?? '').trim();
     const sourceTitle = String(body?.sourceTitle ?? '').trim();
     const sourceArtist = String(body?.sourceArtist ?? '').trim();
+    const reservedSortOrder = Number.isFinite(body?.sortOrder) ? Number(body.sortOrder) : null;
 
     if (!Number.isFinite(playlistId) || playlistId <= 0) {
       return NextResponse.json({ error: 'playlistId is required' }, { status: 400 });
@@ -32,16 +33,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, alreadyPresent: true });
     }
 
-    const { data: maxSortRow } = await db
-      .from('collection_playlist_items')
-      .select('sort_order')
-      .eq('playlist_id', playlistId)
-      .order('sort_order', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    let nextSortOrder = reservedSortOrder;
+    if (nextSortOrder === null) {
+      const { data: maxSortRow } = await db
+        .from('collection_playlist_items')
+        .select('sort_order')
+        .eq('playlist_id', playlistId)
+        .order('sort_order', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    const nextSortOrder =
-      maxSortRow && typeof maxSortRow.sort_order === 'number' ? maxSortRow.sort_order + 1 : 0;
+      nextSortOrder =
+        maxSortRow && typeof maxSortRow.sort_order === 'number' ? maxSortRow.sort_order + 1 : 0;
+    }
 
     const { error: insertError } = await db
       .from('collection_playlist_items')

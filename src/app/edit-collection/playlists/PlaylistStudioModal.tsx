@@ -99,6 +99,7 @@ type UnmatchedTrack = {
   title?: string;
   artist?: string;
   album?: string;
+  sortOrder: number;
   candidates: MatchCandidate[];
 };
 
@@ -275,12 +276,6 @@ const isBetweenValue = (
 };
 
 const inferPlaylistNameFromFile = (file: File) => file.name.replace(/\.[^.]+$/, '').trim() || 'CSV Import';
-
-const toCsvCell = (value: string | undefined) => {
-  const raw = String(value ?? '');
-  if (!raw.includes('"') && !raw.includes(',') && !raw.includes('\n')) return raw;
-  return `"${raw.replace(/"/g, '""')}"`;
-};
 
 type ContextMenuState = { trackKey: string; index: number; x: number; y: number } | null;
 
@@ -709,6 +704,7 @@ export function PlaylistStudioModal({
       title: typeof row.title === 'string' ? row.title : undefined,
       artist: typeof row.artist === 'string' ? row.artist : undefined,
       album: typeof row.album === 'string' ? row.album : undefined,
+      sortOrder: typeof row.sortOrder === 'number' ? row.sortOrder : Number.MAX_SAFE_INTEGER,
       candidates: Array.isArray(row.candidates)
         ? (row.candidates as MatchCandidate[]).filter((candidate) => String(candidate?.track_key ?? '').trim().length > 0)
         : [],
@@ -1631,17 +1627,18 @@ export function PlaylistStudioModal({
     setError(null);
 
     try {
-      const csvText = [
-        'title,artist',
-        ...unmatchedRows.map((row) => `${toCsvCell(row.title)},${toCsvCell(row.artist)}`),
-      ].join('\n');
       const headers = await getSupabaseAuthHeaders();
       const res = await fetch('/api/playlists/import-csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({
           playlistName: '(append)',
-          csvText,
+          rows: unmatchedRows.map((row) => ({
+            title: row.title,
+            artist: row.artist,
+            album: row.album,
+            reservedSortOrder: row.sortOrder,
+          })),
           existingPlaylistId: lastImportedPlaylistId,
           matchingMode,
           matchFilters: buildImportMatchFilters(),
@@ -1686,6 +1683,7 @@ export function PlaylistStudioModal({
           trackKey: candidate.track_key,
           sourceTitle: row.title,
           sourceArtist: row.artist,
+          sortOrder: row.sortOrder,
         }),
       });
 
@@ -1738,6 +1736,7 @@ export function PlaylistStudioModal({
           album: album || undefined,
           sourceTitle: row.title,
           sourceArtist: row.artist,
+          sortOrder: row.sortOrder,
         }),
       });
 

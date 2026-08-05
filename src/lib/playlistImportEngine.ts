@@ -14,6 +14,10 @@ export type SourceRow = {
   isrc?: string;
   spotifyUri?: string;
   spotifyTrackId?: string;
+  // When set, this row's collection_playlist_items.sort_order is pinned to this
+  // exact value instead of being derived from its position in the batch. Used
+  // to resolve a previously-unmatched row back into its original playlist slot.
+  reservedSortOrder?: number;
 };
 
 export type MatchingMode = "review" | "strict" | "balanced" | "aggressive";
@@ -38,6 +42,10 @@ export type MissingRow = {
   title?: string;
   artist?: string;
   album?: string;
+  // Absolute sort_order slot reserved for this row in its source playlist
+  // position. Pass this back as reservedSortOrder when later resolving the
+  // row so it lands in place instead of being appended to the end.
+  sortOrder: number;
   candidates: MatchCandidate[];
 };
 
@@ -882,6 +890,15 @@ const mergeCandidates = (scored: ScoredTrack[], legacy: MatchCandidate[]) => {
     .slice(0, 10);
 };
 
+export type MatchedRow = { trackKey: string; sourceIndex: number };
+export type PendingMissingRow = {
+  title?: string;
+  artist?: string;
+  album?: string;
+  sourceIndex: number;
+  candidates: MatchCandidate[];
+};
+
 const matchRows = async (
   rows: SourceRow[],
   index: InventoryIndex,
@@ -889,13 +906,13 @@ const matchRows = async (
   authHeader?: string,
   filters?: NormalizedImportMatchFilters
 ) => {
-  const matchedTrackKeys: string[] = [];
-  const missing: MissingRow[] = [];
+  const matched: MatchedRow[] = [];
+  const missing: PendingMissingRow[] = [];
   let fuzzyMatchedCount = 0;
   const legacyIndex = await getLegacyInventoryIndex(authHeader);
   const hasActiveFilters = Boolean(filters?.active);
 
-  for (const row of rows) {
+  for (const [sourceIndex, row] of rows.entries()) {
     const rawTitle = strip(row.title);
     const rawArtist = strip(row.artist);
     const rawAlbum = strip(row.album);
@@ -909,7 +926,7 @@ const matchRows = async (
     if (normIsrc) {
       const isrcHits = index.byIsrc.get(normIsrc) ?? [];
       if (isrcHits.length > 0) {
-        matchedTrackKeys.push(isrcHits[0].trackKey);
+        matched.push({ trackKey: isrcHits[0].trackKey, sourceIndex });
         continue;
       }
     }
@@ -917,21 +934,21 @@ const matchRows = async (
     if (normAlbum) {
       const exactAlbumHits = index.byExactAlbum.get(`${normTitle}::${normArtist}::${normAlbum}`) ?? [];
       if (exactAlbumHits.length > 0) {
-        matchedTrackKeys.push(exactAlbumHits[0].trackKey);
+        matched.push({ trackKey: exactAlbumHits[0].trackKey, sourceIndex });
         continue;
       }
     }
 
     const exactHits = index.byExact.get(`${normTitle}::${normArtist}`) ?? [];
     if (exactHits.length > 0) {
-      matchedTrackKeys.push(exactHits[0].trackKey);
+      matched.push({ trackKey: exactHits[0].trackKey, sourceIndex });
       continue;
     }
 
     const titleMatches = index.byTitle.get(normTitle) ?? [];
     const chosenByTitle = chooseFromTitleMatches(normTitle, normArtist, normAlbum, titleMatches, mode);
     if (chosenByTitle) {
-      matchedTrackKeys.push(chosenByTitle.trackKey);
+      matched.push({ trackKey: chosenByTitle.trackKey, sourceIndex });
       fuzzyMatchedCount += 1;
       continue;
     }
@@ -944,7 +961,7 @@ const matchRows = async (
       .slice(0, 10);
 
     if (scoredCandidates.length > 0 && shouldAutoMatch(scoredCandidates[0], scoredCandidates[1], mode)) {
-      matchedTrackKeys.push(scoredCandidates[0].track.trackKey);
+      matched.push({ trackKey: scoredCandidates[0].track.trackKey, sourceIndex });
       fuzzyMatchedCount += 1;
       continue;
     }
@@ -978,7 +995,7 @@ const matchRows = async (
 
     const legacyAutoTrackKey = chooseLegacyAutoMatch(normTitle, normArtist, legacyMapped, mode);
     if (legacyAutoTrackKey) {
-      matchedTrackKeys.push(legacyAutoTrackKey);
+      matched.push({ trackKey: legacyAutoTrackKey, sourceIndex });
       fuzzyMatchedCount += 1;
       continue;
     }
@@ -989,11 +1006,12 @@ const matchRows = async (
       title: rawTitle || undefined,
       artist: rawArtist || undefined,
       album: rawAlbum || undefined,
+      sourceIndex,
       candidates: mergedCandidates,
     });
   }
 
-  return { matchedTrackKeys, missing, fuzzyMatchedCount };
+  return { matched, missing, fuzzyMatchedCount };
 };
 
 const getPlaylistId = async (
@@ -1058,6 +1076,7 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
       isrc: normalizeIsrc(row.isrc) || undefined,
       spotifyUri: maybeSpotifyUri(row.spotifyUri) || undefined,
       spotifyTrackId: strip(row.spotifyTrackId) || trackIdFromSpotifyUri(row.spotifyUri) || undefined,
+      reservedSortOrder: Number.isFinite(row.reservedSortOrder) ? Number(row.reservedSortOrder) : undefined,
     }))
     .filter((row) => row.title.length > 0);
 
@@ -1082,14 +1101,19 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
 
   const index = buildIndex(filteredInventoryTracks);
 
-  const { matchedTrackKeys, missing, fuzzyMatchedCount } = await matchRows(
+  const { matched, missing, fuzzyMatchedCount } = await matchRows(
     rows,
     index,
     matchingMode,
     options.authHeader,
     matchFilters
   );
-  const dedupedMatched = Array.from(new Set(matchedTrackKeys));
+
+  // Dedup by trackKey, keeping the first (lowest-index, i.e. earliest-in-source) occurrence.
+  const dedupedMatched = new Map<string, number>();
+  for (const { trackKey, sourceIndex } of matched) {
+    if (!dedupedMatched.has(trackKey)) dedupedMatched.set(trackKey, sourceIndex);
+  }
 
   const playlistId = await getPlaylistId(db, options, playlistName);
 
@@ -1115,13 +1139,19 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
     if (sortOrder > maxSortOrder) maxSortOrder = sortOrder;
   }
 
-  const newTrackKeys = dedupedMatched.filter((key) => !existingKeys.has(key));
+  // Every source row gets an absolute, reserved sort_order slot based on its
+  // position in this batch (or a pinned value if the caller already reserved
+  // one for it, e.g. resolving a previously-unmatched row back into place).
+  const resolveSortOrder = (sourceIndex: number) =>
+    rows[sourceIndex]?.reservedSortOrder ?? maxSortOrder + 1 + sourceIndex;
 
-  if (newTrackKeys.length > 0) {
-    const insertRows = newTrackKeys.map((trackKey, idx) => ({
+  const newEntries = Array.from(dedupedMatched.entries()).filter(([trackKey]) => !existingKeys.has(trackKey));
+
+  if (newEntries.length > 0) {
+    const insertRows = newEntries.map(([trackKey, sourceIndex]) => ({
       playlist_id: playlistId,
       track_key: trackKey,
-      sort_order: maxSortOrder + idx + 1,
+      sort_order: resolveSortOrder(sourceIndex),
     }));
 
     const { error: insertError } = await db
@@ -1131,15 +1161,20 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
     if (insertError) throw insertError;
   }
 
+  const missingWithSortOrder: MissingRow[] = missing.map(({ sourceIndex, ...rest }) => ({
+    ...rest,
+    sortOrder: resolveSortOrder(sourceIndex),
+  }));
+
   return {
     playlistId,
     playlistName,
     matchingMode,
     sourceCount: rows.length,
-    matchedCount: newTrackKeys.length,
+    matchedCount: newEntries.length,
     fuzzyMatchedCount,
-    unmatchedCount: missing.length,
-    unmatchedSample: missing.slice(0, 100),
-    duplicatesSkipped: dedupedMatched.length - newTrackKeys.length,
+    unmatchedCount: missingWithSortOrder.length,
+    unmatchedSample: missingWithSortOrder.slice(0, 100),
+    duplicatesSkipped: dedupedMatched.size - newEntries.length,
   };
 };
