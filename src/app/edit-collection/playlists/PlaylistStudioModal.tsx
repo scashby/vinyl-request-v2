@@ -826,6 +826,9 @@ export function PlaylistStudioModal({
 
   const openManualEdit = useCallback((playlist: CollectionPlaylist) => {
     if (playlist.isSmart) return;
+    setError(null);
+    setNotice(null);
+    setImportSummary(null);
     setManualEditingId(playlist.id);
     setManualName(playlist.name);
     setManualIcon(playlist.icon || '🎵');
@@ -863,6 +866,10 @@ export function PlaylistStudioModal({
 
   const openSmartEdit = useCallback((playlist: CollectionPlaylist) => {
     if (!playlist.isSmart) return;
+
+    setError(null);
+    setNotice(null);
+    setImportSummary(null);
 
     const normalizedRules = (playlist.smartRules?.rules ?? [])
       .map((rule) => ({ ...rule, field: normalizeRuleField(rule.field) }))
@@ -1823,6 +1830,7 @@ export function PlaylistStudioModal({
                     onClick={() => {
                       setError(null);
                       setNotice(null);
+                      setImportSummary(null);
                       setView(item.id);
                     }}
                     className={`rounded-xl border px-3 py-2 text-left transition ${
