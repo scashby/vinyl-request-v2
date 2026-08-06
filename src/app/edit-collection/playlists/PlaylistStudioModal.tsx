@@ -1724,6 +1724,8 @@ export function PlaylistStudioModal({
         throw new Error(formatApiError(payload, res));
       }
 
+      const remainingUnmatched = unmatchedRows.filter((item) => item.row_id !== row.row_id).length;
+      setImportSummary(`Added "${candidate.title}" - ${remainingUnmatched} unmatched remaining`);
       setUnmatchedRows((prev) => prev.filter((item) => item.row_id !== row.row_id));
       setUnmatchedQueryByRow((prev) => {
         const next = { ...prev };
@@ -1777,6 +1779,8 @@ export function PlaylistStudioModal({
         throw new Error(formatApiError(payload, res));
       }
 
+      const remainingUnmatched = unmatchedRows.filter((item) => item.row_id !== row.row_id).length;
+      setImportSummary(`Added custom track "${title}" - ${remainingUnmatched} unmatched remaining`);
       setUnmatchedRows((prev) => prev.filter((item) => item.row_id !== row.row_id));
       setUnmatchedQueryByRow((prev) => {
         const next = { ...prev };
