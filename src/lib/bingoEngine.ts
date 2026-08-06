@@ -922,13 +922,15 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
   const artistById = new Map<number, DbArtist>(((artists ?? []) as DbArtist[]).map((row) => [row.id, row]));
 
   const resolved: ResolvedPlaylistTrack[] = [];
-  const staleItemIds: number[] = [];
 
   for (const { item, parsed } of parsedRows) {
     const inventory = parsed.inventoryId ? inventoryById.get(parsed.inventoryId) : undefined;
     if (!inventory?.release_id) {
-      // Skip stale playlist rows that no longer map to a real inventory item/release.
-      staleItemIds.push(item.id);
+      // Unresolvable: excluded from this result, but the underlying row is left
+      // alone. A read must never delete data -- if a row is genuinely stale it
+      // needs an explicit, logged cleanup action, not a silent side effect of
+      // someone opening the playlist.
+      console.warn(`resolvePlaylistTracks: unresolvable item (no inventory/release_id), playlist ${playlistId} item ${item.id} track_key ${item.track_key}`);
       continue;
     }
 
@@ -950,8 +952,7 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
     const recording = recordingId ? recordingById.get(recordingId) : undefined;
 
     if (!releaseTrack && !recording) {
-      // Keep games faithful to the playlist by dropping unresolvable ghost rows.
-      staleItemIds.push(item.id);
+      console.warn(`resolvePlaylistTracks: unresolvable item (no release_track/recording match), playlist ${playlistId} item ${item.id} track_key ${item.track_key}`);
       continue;
     }
 
@@ -976,14 +977,6 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
       linkGroup: item.link_group ?? null,
       themeHint: item.theme_hint ?? null,
     });
-  }
-
-  if (staleItemIds.length > 0) {
-    try {
-      await db.from("collection_playlist_items").delete().in("id", staleItemIds);
-    } catch {
-      // Non-fatal: unresolved rows are still excluded from gameplay even if pruning fails.
-    }
   }
 
   return resolved;
@@ -1120,7 +1113,10 @@ export async function resolveTrackKeys(db: BingoDbClient, trackKeys: string[]): 
   const result = new Map<string, ResolvedTrackKey>();
   parsedRows.forEach(({ track_key, parsed }, index) => {
     const inventory = parsed.inventoryId ? inventoryById.get(parsed.inventoryId) : undefined;
-    if (!inventory?.release_id) return;
+    if (!inventory?.release_id) {
+      console.warn(`resolveTrackKeys: dropping unresolvable track_key (no inventory/release_id): ${track_key}`);
+      return;
+    }
 
     const release = inventory?.release_id ? releaseById.get(inventory.release_id) : undefined;
     const master = release?.master_id ? masterById.get(release.master_id) : undefined;
@@ -1139,7 +1135,10 @@ export async function resolveTrackKeys(db: BingoDbClient, trackKeys: string[]): 
     const recordingId = releaseTrack?.recording_id ?? parsed.recordingId ?? null;
     const recording = recordingId ? recordingById.get(recordingId) : undefined;
 
-    if (!releaseTrack && !recording) return;
+    if (!releaseTrack && !recording) {
+      console.warn(`resolveTrackKeys: dropping unresolvable track_key (no release_track/recording match): ${track_key}`);
+      return;
+    }
 
     const position = releaseTrack?.position ?? parsed.fallbackPosition ?? null;
     const fallbackTitle = position ? `Track ${position}` : `Track ${index + 1}`;
