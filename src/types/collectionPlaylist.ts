@@ -14,20 +14,6 @@ export interface CollectionPlaylist {
   smartRules: SmartPlaylistRules | null;
   matchRules: 'all' | 'any';
   liveUpdate: boolean;
-  lastImportSummary?: PlaylistImportSummary | null;
-}
-
-// Persisted import audit record -- survives independent of any UI banner
-// state, so how a playlist was actually built is never a guess later.
-export interface PlaylistImportSummary {
-  importedAt: string;
-  mode: string;
-  sourceCount: number;
-  exactMatchedCount: number;
-  fuzzyMatchedCount: number;
-  unmatchedCount: number;
-  customCount: number;
-  manualCount: number;
 }
 
 export interface SmartPlaylistRules {

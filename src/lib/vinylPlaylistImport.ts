@@ -608,8 +608,7 @@ export const fetchInventoryTracks = async (
     // is dropped from the chunk before fetching its tracks below.
     const nonCustomReleaseIds: number[] = [];
     {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: releases, error: releaseError } = await (supabase as any)
+      const { data: releases, error: releaseError } = await supabase
         .from("releases")
         .select("id, media_type, format_details, is_custom, master:masters(title, artist:artists(name))")
         .in("id", chunk)

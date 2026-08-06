@@ -2090,7 +2090,7 @@ function CollectionBrowserPage() {
   const loadPlaylists = useCallback(async () => {
     const { data: playlistRows, error: playlistError } = await supabase
       .from('collection_playlists')
-      .select('id, name, icon, color, cover_image_url, sort_order, created_at, is_smart, smart_rules, match_rules, live_update, last_import_summary')
+      .select('id, name, icon, color, cover_image_url, sort_order, created_at, is_smart, smart_rules, match_rules, live_update')
       .order('sort_order', { ascending: true });
 
     if (playlistError) {
@@ -2174,7 +2174,6 @@ function CollectionBrowserPage() {
       smartRules: row.smart_rules ?? null,
       matchRules: row.match_rules === 'any' ? 'any' : 'all',
       liveUpdate: row.live_update !== false,
-      lastImportSummary: row.last_import_summary ?? null,
     }));
 
     setPlaylists(mapped);
