@@ -89,6 +89,7 @@ type DbPlaylistItem = {
   link_group: string | null;
   theme_hint: string | null;
   display_title: string | null;
+  display_artist: string | null;
 };
 
 type DbInventory = { id: number; release_id: number | null };
@@ -819,13 +820,13 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
 
   const { data: playlistItems, error: itemError } = await db
     .from("collection_playlist_items")
-    .select("id, playlist_id, track_key, sort_order, link_group, theme_hint, display_title")
+    .select("id, playlist_id, track_key, sort_order, link_group, theme_hint, display_title, display_artist")
     .eq("playlist_id", playlistId)
     .order("sort_order", { ascending: true });
 
   if (itemError) throw new Error(itemError.message);
 
-  const source = (playlistItems ?? []) as DbPlaylistItem[];
+  const source = (playlistItems ?? []) as unknown as DbPlaylistItem[];
   const parsedRows = source.map((item) => ({ item, parsed: parseTrackKey(item.track_key) }));
 
   const inventoryIds = Array.from(new Set(parsedRows.map((row) => row.parsed.inventoryId).filter((id): id is number => id !== null)));
@@ -959,11 +960,13 @@ export async function resolvePlaylistTracks(db: BingoDbClient, playlistId: numbe
     const position = releaseTrack?.position ?? parsed.fallbackPosition ?? null;
     const fallbackTitle = position ? `Track ${position}` : `Track ${item.sort_order + 1}`;
     const trackTitle = item.display_title ?? releaseTrack?.title_override ?? recording?.title ?? fallbackTitle;
-    const artistName = resolveTrackArtist({
-      trackArtist: recording?.track_artist,
-      credits: recording?.credits,
-      albumArtist: master?.main_artist_id ? artistById.get(master.main_artist_id)?.name : undefined,
-    });
+    const artistName =
+      item.display_artist ??
+      resolveTrackArtist({
+        trackArtist: recording?.track_artist,
+        credits: recording?.credits,
+        albumArtist: master?.main_artist_id ? artistById.get(master.main_artist_id)?.name : undefined,
+      });
 
     resolved.push({
       trackKey: item.track_key,
