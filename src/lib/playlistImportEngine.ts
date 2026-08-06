@@ -890,7 +890,7 @@ const mergeCandidates = (scored: ScoredTrack[], legacy: MatchCandidate[]) => {
     .slice(0, 10);
 };
 
-export type MatchedRow = { trackKey: string; sourceIndex: number };
+export type MatchedRow = { trackKey: string; sourceIndex: number; matchType: "exact" | "fuzzy"; matchScore: number | null };
 export type PendingMissingRow = {
   title?: string;
   artist?: string;
@@ -926,7 +926,7 @@ const matchRows = async (
     if (normIsrc) {
       const isrcHits = index.byIsrc.get(normIsrc) ?? [];
       if (isrcHits.length > 0) {
-        matched.push({ trackKey: isrcHits[0].trackKey, sourceIndex });
+        matched.push({ trackKey: isrcHits[0].trackKey, sourceIndex, matchType: "exact", matchScore: 1 });
         continue;
       }
     }
@@ -934,21 +934,21 @@ const matchRows = async (
     if (normAlbum) {
       const exactAlbumHits = index.byExactAlbum.get(`${normTitle}::${normArtist}::${normAlbum}`) ?? [];
       if (exactAlbumHits.length > 0) {
-        matched.push({ trackKey: exactAlbumHits[0].trackKey, sourceIndex });
+        matched.push({ trackKey: exactAlbumHits[0].trackKey, sourceIndex, matchType: "exact", matchScore: 1 });
         continue;
       }
     }
 
     const exactHits = index.byExact.get(`${normTitle}::${normArtist}`) ?? [];
     if (exactHits.length > 0) {
-      matched.push({ trackKey: exactHits[0].trackKey, sourceIndex });
+      matched.push({ trackKey: exactHits[0].trackKey, sourceIndex, matchType: "exact", matchScore: 1 });
       continue;
     }
 
     const titleMatches = index.byTitle.get(normTitle) ?? [];
     const chosenByTitle = chooseFromTitleMatches(normTitle, normArtist, normAlbum, titleMatches, mode);
     if (chosenByTitle) {
-      matched.push({ trackKey: chosenByTitle.trackKey, sourceIndex });
+      matched.push({ trackKey: chosenByTitle.trackKey, sourceIndex, matchType: "fuzzy", matchScore: null });
       fuzzyMatchedCount += 1;
       continue;
     }
@@ -961,7 +961,12 @@ const matchRows = async (
       .slice(0, 10);
 
     if (scoredCandidates.length > 0 && shouldAutoMatch(scoredCandidates[0], scoredCandidates[1], mode)) {
-      matched.push({ trackKey: scoredCandidates[0].track.trackKey, sourceIndex });
+      matched.push({
+        trackKey: scoredCandidates[0].track.trackKey,
+        sourceIndex,
+        matchType: "fuzzy",
+        matchScore: scoredCandidates[0].score,
+      });
       fuzzyMatchedCount += 1;
       continue;
     }
@@ -995,7 +1000,8 @@ const matchRows = async (
 
     const legacyAutoTrackKey = chooseLegacyAutoMatch(normTitle, normArtist, legacyMapped, mode);
     if (legacyAutoTrackKey) {
-      matched.push({ trackKey: legacyAutoTrackKey, sourceIndex });
+      const legacyScore = legacyMapped.find((c) => c.track_key === legacyAutoTrackKey)?.score ?? null;
+      matched.push({ trackKey: legacyAutoTrackKey, sourceIndex, matchType: "fuzzy", matchScore: legacyScore });
       fuzzyMatchedCount += 1;
       continue;
     }
@@ -1110,9 +1116,9 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
   );
 
   // Dedup by trackKey, keeping the first (lowest-index, i.e. earliest-in-source) occurrence.
-  const dedupedMatched = new Map<string, number>();
-  for (const { trackKey, sourceIndex } of matched) {
-    if (!dedupedMatched.has(trackKey)) dedupedMatched.set(trackKey, sourceIndex);
+  const dedupedMatched = new Map<string, { sourceIndex: number; matchType: "exact" | "fuzzy"; matchScore: number | null }>();
+  for (const { trackKey, sourceIndex, matchType, matchScore } of matched) {
+    if (!dedupedMatched.has(trackKey)) dedupedMatched.set(trackKey, { sourceIndex, matchType, matchScore });
   }
 
   const playlistId = await getPlaylistId(db, options, playlistName);
@@ -1148,10 +1154,12 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
   const newEntries = Array.from(dedupedMatched.entries()).filter(([trackKey]) => !existingKeys.has(trackKey));
 
   if (newEntries.length > 0) {
-    const insertRows = newEntries.map(([trackKey, sourceIndex]) => ({
+    const insertRows = newEntries.map(([trackKey, { sourceIndex, matchType, matchScore }]) => ({
       playlist_id: playlistId,
       track_key: trackKey,
       sort_order: resolveSortOrder(sourceIndex),
+      match_type: matchType,
+      match_score: matchScore,
     }));
 
     const { error: insertError } = await db
@@ -1165,6 +1173,37 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
     ...rest,
     sortOrder: resolveSortOrder(sourceIndex),
   }));
+
+  const exactMatchedCount = newEntries.filter(([, v]) => v.matchType === "exact").length;
+  const fuzzyMatchedInsertedCount = newEntries.filter(([, v]) => v.matchType === "fuzzy").length;
+
+  // Persisted audit record -- survives independent of any UI banner state,
+  // so "how was this playlist actually built" is never a guess later.
+  const { data: existingSummaryRow } = await db
+    .from("collection_playlists")
+    .select("last_import_summary")
+    .eq("id", playlistId)
+    .maybeSingle();
+  const priorSummary =
+    existingSummaryRow?.last_import_summary && typeof existingSummaryRow.last_import_summary === "object"
+      ? existingSummaryRow.last_import_summary
+      : null;
+
+  await db
+    .from("collection_playlists")
+    .update({
+      last_import_summary: {
+        importedAt: new Date().toISOString(),
+        mode: matchingMode,
+        sourceCount: rows.length,
+        exactMatchedCount: (priorSummary?.exactMatchedCount ?? 0) + exactMatchedCount,
+        fuzzyMatchedCount: (priorSummary?.fuzzyMatchedCount ?? 0) + fuzzyMatchedInsertedCount,
+        unmatchedCount: missingWithSortOrder.length,
+        customCount: priorSummary?.customCount ?? 0,
+        manualCount: priorSummary?.manualCount ?? 0,
+      },
+    })
+    .eq("id", playlistId);
 
   return {
     playlistId,

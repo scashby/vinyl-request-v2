@@ -302,6 +302,12 @@ type SortableManualTrackRowProps = {
   onEditingTitleValueChange: (value: string) => void;
   onEditingTitleSave: () => void;
   onEditingTitleCancel: () => void;
+  onStartEditingArtist: (trackKey: string) => void;
+  isEditingArtist: boolean;
+  editingArtistValue: string;
+  onEditingArtistValueChange: (value: string) => void;
+  onEditingArtistSave: () => void;
+  onEditingArtistCancel: () => void;
 };
 
 function SortableManualTrackRow({
@@ -319,6 +325,12 @@ function SortableManualTrackRow({
   onEditingTitleValueChange,
   onEditingTitleSave,
   onEditingTitleCancel,
+  onStartEditingArtist,
+  isEditingArtist,
+  editingArtistValue,
+  onEditingArtistValueChange,
+  onEditingArtistSave,
+  onEditingArtistCancel,
 }: SortableManualTrackRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: track.track_key,
@@ -397,7 +409,32 @@ function SortableManualTrackRow({
               </span>
             )}
           </div>
-          <div className="truncate text-xs text-[#6a8fbf]">{track.artist_name ?? ''}</div>
+          {isEditingArtist ? (
+            <input
+              autoFocus
+              type="text"
+              value={editingArtistValue}
+              onChange={(e) => onEditingArtistValueChange(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); onEditingArtistSave(); }
+                if (e.key === 'Escape') { e.preventDefault(); onEditingArtistCancel(); }
+              }}
+              onBlur={onEditingArtistSave}
+              className="w-full rounded border border-[#4a7fcc] bg-[#0d1a2e] px-2 py-0.5 text-xs text-[#c8daff] focus:outline-none"
+            />
+          ) : (
+            <div
+              className="cursor-text truncate text-xs text-[#6a8fbf] hover:text-[#9dc2ff]"
+              title="Click to edit artist"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStartEditingArtist(track.track_key);
+              }}
+            >
+              {track.artist_name ?? ''}
+            </div>
+          )}
           {track.theme_hint !== undefined && (
             <input
               type="text"
@@ -464,6 +501,8 @@ export function PlaylistStudioModal({
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [editingTitleKey, setEditingTitleKey] = useState<string | null>(null);
   const [editingTitleValue, setEditingTitleValue] = useState('');
+  const [editingArtistKey, setEditingArtistKey] = useState<string | null>(null);
+  const [editingArtistValue, setEditingArtistValue] = useState('');
   const [showEditDetails, setShowEditDetails] = useState(false);
   const [manualCoverImageUrl, setManualCoverImageUrl] = useState<string | null>(null);
   const [coverImageUploading, setCoverImageUploading] = useState(false);
@@ -696,6 +735,44 @@ export function PlaylistStudioModal({
   const cancelEditingTitle = useCallback(() => {
     setEditingTitleKey(null);
     setEditingTitleValue('');
+  }, []);
+
+  const startEditingArtist = useCallback((trackKey: string) => {
+    const track = manualTracks.find((t) => t.track_key === trackKey);
+    setEditingArtistKey(trackKey);
+    setEditingArtistValue(track?.artist_name ?? '');
+  }, [manualTracks]);
+
+  const saveDisplayArtist = useCallback(async () => {
+    if (!editingArtistKey || !manualEditingPlaylist) return;
+    const newArtist = editingArtistValue.trim() || null;
+    const track = manualTracks.find((t) => t.track_key === editingArtistKey);
+    const previousArtist = track?.artist_name ?? null;
+
+    setEditingArtistKey(null);
+    setEditingArtistValue('');
+
+    setManualTracks((prev) =>
+      prev.map((t) => t.track_key === editingArtistKey ? { ...t, artist_name: newArtist } : t)
+    );
+
+    try {
+      const headers = await getSupabaseAuthHeaders();
+      await fetch(`/api/playlists/${manualEditingPlaylist.id}/tracks`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ track_key: editingArtistKey, display_artist: newArtist }),
+      });
+    } catch {
+      setManualTracks((prev) =>
+        prev.map((t) => t.track_key === editingArtistKey ? { ...t, artist_name: previousArtist } : t)
+      );
+    }
+  }, [editingArtistKey, editingArtistValue, getSupabaseAuthHeaders, manualEditingPlaylist, manualTracks]);
+
+  const cancelEditingArtist = useCallback(() => {
+    setEditingArtistKey(null);
+    setEditingArtistValue('');
   }, []);
 
   const formatApiError = (payload: unknown, res: Response) => {
@@ -2127,6 +2204,15 @@ export function PlaylistStudioModal({
                       <div className="mt-2 text-sm text-[#a0b4d6]">
                         {manualTrackKeys.length} track{manualTrackKeys.length === 1 ? '' : 's'}
                       </div>
+                      {manualEditingPlaylist?.lastImportSummary && (
+                        <div className="mt-1 text-xs text-[#7d93bb]" title={`Imported ${new Date(manualEditingPlaylist.lastImportSummary.importedAt).toLocaleString()} [mode: ${manualEditingPlaylist.lastImportSummary.mode}]`}>
+                          Import audit — exact: {manualEditingPlaylist.lastImportSummary.exactMatchedCount},
+                          {' '}fuzzy: {manualEditingPlaylist.lastImportSummary.fuzzyMatchedCount},
+                          {' '}custom: {manualEditingPlaylist.lastImportSummary.customCount},
+                          {' '}manual: {manualEditingPlaylist.lastImportSummary.manualCount},
+                          {' '}unmatched: {manualEditingPlaylist.lastImportSummary.unmatchedCount}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2 pb-1">
@@ -2268,6 +2354,12 @@ export function PlaylistStudioModal({
                                 onEditingTitleValueChange={setEditingTitleValue}
                                 onEditingTitleSave={saveDisplayTitle}
                                 onEditingTitleCancel={cancelEditingTitle}
+                                onStartEditingArtist={startEditingArtist}
+                                isEditingArtist={editingArtistKey === track.track_key}
+                                editingArtistValue={editingArtistValue}
+                                onEditingArtistValueChange={setEditingArtistValue}
+                                onEditingArtistSave={saveDisplayArtist}
+                                onEditingArtistCancel={cancelEditingArtist}
                               />
                             );
                           })}

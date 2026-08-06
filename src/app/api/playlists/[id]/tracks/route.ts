@@ -36,8 +36,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 }
 
 /** PATCH /api/playlists/[id]/tracks
- *  Body: { track_key: string; display_title: string | null }
- *  Sets (or clears) the per-playlist display title for a single track item.
+ *  Body: { track_key: string; display_title?: string | null; display_artist?: string | null }
+ *  Sets (or clears) the per-playlist display title/artist for a single track item.
  */
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -57,24 +57,37 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     return NextResponse.json({ error: "Body must be an object" }, { status: 400 });
   }
 
-  const { track_key, display_title } = body as Record<string, unknown>;
+  const { track_key, display_title, display_artist } = body as Record<string, unknown>;
 
   if (typeof track_key !== "string" || !track_key.trim()) {
     return NextResponse.json({ error: "track_key is required" }, { status: 400 });
   }
 
-  if (display_title !== null && typeof display_title !== "string") {
+  if (display_title !== undefined && display_title !== null && typeof display_title !== "string") {
     return NextResponse.json({ error: "display_title must be a string or null" }, { status: 400 });
   }
+  if (display_artist !== undefined && display_artist !== null && typeof display_artist !== "string") {
+    return NextResponse.json({ error: "display_artist must be a string or null" }, { status: 400 });
+  }
 
-  const normalizedTitle =
-    display_title === null ? null : (display_title as string).trim() || null;
+  const updates: Record<string, string | null> = {};
+  if (display_title !== undefined) {
+    updates.display_title = display_title === null ? null : (display_title as string).trim() || null;
+  }
+  if (display_artist !== undefined) {
+    updates.display_artist = display_artist === null ? null : (display_artist as string).trim() || null;
+  }
 
-  const db = getBingoDb();
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: "display_title or display_artist is required" }, { status: 400 });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = getBingoDb() as any;
 
   const { error } = await db
     .from("collection_playlist_items")
-    .update({ display_title: normalizedTitle })
+    .update(updates)
     .eq("playlist_id", playlistId)
     .eq("track_key", track_key.trim());
 

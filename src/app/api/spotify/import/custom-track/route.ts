@@ -63,9 +63,29 @@ export async function POST(req: Request) {
       playlist_id: playlistId,
       track_key: trackKey,
       sort_order: nextSortOrder,
+      match_type: 'custom',
     });
 
     if (insertError) throw insertError;
+
+    const { data: playlistRow } = await db
+      .from('collection_playlists')
+      .select('last_import_summary')
+      .eq('id', playlistId)
+      .maybeSingle();
+    const summary = playlistRow?.last_import_summary ?? null;
+    if (summary && typeof summary === 'object') {
+      await db
+        .from('collection_playlists')
+        .update({
+          last_import_summary: {
+            ...summary,
+            customCount: (summary.customCount ?? 0) + 1,
+            unmatchedCount: Math.max(0, (summary.unmatchedCount ?? 1) - 1),
+          },
+        })
+        .eq('id', playlistId);
+    }
 
     return NextResponse.json({
       ok: true,
