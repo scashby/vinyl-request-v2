@@ -2616,6 +2616,9 @@ export function PlaylistStudioModal({
 
               {view === 'import' && (
                 <div className="space-y-4">
+                  <div className="rounded-2xl border-4 border-black bg-[#ff2ec4] p-3 text-center text-sm font-black uppercase tracking-widest text-black">
+                    BUILD MARKER: HOT PINK — v2026-08-06-01
+                  </div>
                   <div className="rounded-2xl border border-[#2e3f5f] bg-[#121e34] p-4">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-[#8faddd]">Import Destination</div>
                     <div className="flex flex-wrap gap-2">
