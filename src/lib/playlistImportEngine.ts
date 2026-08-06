@@ -1,6 +1,7 @@
 import Papa from "papaparse";
 import { supabaseServer } from "src/lib/supabaseServer";
 import { stripDiscogsDisambiguationSuffix } from "src/lib/artistName";
+import { createCustomTrack } from "src/lib/customTrackWorkflow";
 import {
   fetchInventoryTracks as fetchLegacyInventoryTracks,
   getCachedInventoryIndex as getLegacyInventoryIndex,
@@ -245,6 +246,7 @@ const normalizeFormatToken = (value: unknown) => {
   return raw;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const normalizeImportMatchFilters = (filters?: ImportMatchFilters): NormalizedImportMatchFilters => {
   const mediaTypes = new Set(
     (Array.isArray(filters?.mediaTypes) ? filters.mediaTypes : [])
@@ -282,6 +284,7 @@ const buildTrackFormatTokens = (track: InventoryTrack) => {
   return tokens;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const matchesImportFilters = (track: InventoryTrack, filters: NormalizedImportMatchFilters) => {
   if (!filters.active) return true;
   const tokens = buildTrackFormatTokens(track);
@@ -617,6 +620,7 @@ export const parseCsvRows = (csvText: string): SourceRow[] => {
   return rows;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const loadInventoryTracks = async (authHeader?: string): Promise<InventoryTrack[]> => {
   const legacyTracks = await fetchLegacyInventoryTracks(authHeader);
   const tracks: InventoryTrack[] = [];
@@ -670,6 +674,7 @@ const loadInventoryTracks = async (authHeader?: string): Promise<InventoryTrack[
   return Array.from(deduped.values());
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const buildIndex = (tracks: InventoryTrack[]): InventoryIndex => {
   const byIsrc = new Map<string, InventoryTrack[]>();
   const byExact = new Map<string, InventoryTrack[]>();
@@ -899,6 +904,7 @@ export type PendingMissingRow = {
   candidates: MatchCandidate[];
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const matchRows = async (
   rows: SourceRow[],
   index: InventoryIndex,
@@ -1088,32 +1094,6 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
   const db = supabaseServer(options.authHeader) as any;
   const playlistName = sanitizePlaylistName(options.playlistName);
   const matchingMode = normalizeMatchingMode(options.matchingMode);
-  const matchFilters = normalizeImportMatchFilters(options.matchFilters);
-
-  const inventoryTracks = await loadInventoryTracks(options.authHeader);
-  const filteredInventoryTracks = matchFilters.active
-    ? inventoryTracks.filter((track) => matchesImportFilters(track, matchFilters))
-    : inventoryTracks;
-
-  if (filteredInventoryTracks.length === 0) {
-    throw new Error("No inventory tracks match the selected import restrictions");
-  }
-
-  const index = buildIndex(filteredInventoryTracks);
-
-  const { matched, missing, fuzzyMatchedCount } = await matchRows(
-    rows,
-    index,
-    matchingMode,
-    options.authHeader,
-    matchFilters
-  );
-
-  // Dedup by trackKey, keeping the first (lowest-index, i.e. earliest-in-source) occurrence.
-  const dedupedMatched = new Map<string, number>();
-  for (const { trackKey, sourceIndex } of matched) {
-    if (!dedupedMatched.has(trackKey)) dedupedMatched.set(trackKey, sourceIndex);
-  }
 
   const playlistId = await getPlaylistId(db, options, playlistName);
 
@@ -1139,13 +1119,20 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
     if (sortOrder > maxSortOrder) maxSortOrder = sortOrder;
   }
 
-  // Every source row gets an absolute, reserved sort_order slot based on its
-  // position in this batch (or a pinned value if the caller already reserved
-  // one for it, e.g. resolving a previously-unmatched row back into place).
+  // No matching against inventory at all -- an import is the playlist.
+  // Every source row becomes its own custom track, in source order.
+  const dedupedByTrackKey = new Map<string, number>();
+  for (const [sourceIndex, row] of rows.entries()) {
+    const custom = await createCustomTrack(db, { title: row.title, artist: row.artist, album: row.album });
+    if (!dedupedByTrackKey.has(custom.trackKey)) {
+      dedupedByTrackKey.set(custom.trackKey, sourceIndex);
+    }
+  }
+
   const resolveSortOrder = (sourceIndex: number) =>
     rows[sourceIndex]?.reservedSortOrder ?? maxSortOrder + 1 + sourceIndex;
 
-  const newEntries = Array.from(dedupedMatched.entries()).filter(([trackKey]) => !existingKeys.has(trackKey));
+  const newEntries = Array.from(dedupedByTrackKey.entries()).filter(([trackKey]) => !existingKeys.has(trackKey));
 
   if (newEntries.length > 0) {
     const insertRows = newEntries.map(([trackKey, sourceIndex]) => ({
@@ -1161,20 +1148,15 @@ export const importRowsToPlaylist = async (options: ImportOptions): Promise<Impo
     if (insertError) throw insertError;
   }
 
-  const missingWithSortOrder: MissingRow[] = missing.map(({ sourceIndex, ...rest }) => ({
-    ...rest,
-    sortOrder: resolveSortOrder(sourceIndex),
-  }));
-
   return {
     playlistId,
     playlistName,
     matchingMode,
     sourceCount: rows.length,
     matchedCount: newEntries.length,
-    fuzzyMatchedCount,
-    unmatchedCount: missingWithSortOrder.length,
-    unmatchedSample: missingWithSortOrder.slice(0, 100),
-    duplicatesSkipped: dedupedMatched.size - newEntries.length,
+    fuzzyMatchedCount: 0,
+    unmatchedCount: 0,
+    unmatchedSample: [],
+    duplicatesSkipped: dedupedByTrackKey.size - newEntries.length,
   };
 };
