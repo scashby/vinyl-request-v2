@@ -288,6 +288,30 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       if (playlistInsertError) throw new Error(playlistInsertError.message);
     }
 
+    const { data: sourceRoundCards, error: sourceRoundCardsError } = await db
+      .from("bingo_session_round_cards")
+      .select("round_number, card_number, has_free_space, grid")
+      .eq("session_id", sourceSessionId)
+      .order("round_number", { ascending: true })
+      .order("card_number", { ascending: true });
+
+    if (sourceRoundCardsError) throw new Error(sourceRoundCardsError.message);
+
+    const roundCardRows = (sourceRoundCards ?? []) as Array<{ round_number: number; card_number: number; has_free_space: boolean; grid: Json }>;
+    if (roundCardRows.length > 0) {
+      const { error: roundCardInsertError } = await db.from("bingo_session_round_cards").insert(
+        roundCardRows.map((row) => ({
+          session_id: sandboxSessionId,
+          round_number: row.round_number,
+          card_number: row.card_number,
+          card_identifier: buildCardIdentifier(sessionCode, row.card_number),
+          has_free_space: row.has_free_space,
+          grid: row.grid,
+        }))
+      );
+      if (roundCardInsertError) throw new Error(roundCardInsertError.message);
+    }
+
     const { data: sourceCards, error: sourceCardsError } = await db
       .from("bingo_cards")
       .select("card_number, has_free_space, grid")
