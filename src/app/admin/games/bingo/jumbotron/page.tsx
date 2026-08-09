@@ -153,7 +153,7 @@ function VinylCascade() {
 }
 
 // One-off "Wake Up" jumbotron override for session BWDA85 only — safe to remove after that event.
-function EasterEggVideo({ src, onEnded }: { src: string; onEnded: () => void }) {
+function EasterEggVideo({ src, startAt = 0, onEnded }: { src: string; startAt?: number; onEnded: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -164,8 +164,28 @@ function EasterEggVideo({ src, onEnded }: { src: string; onEnded: () => void }) 
     // native play button instead of playing). Setting .muted imperatively before .play() is the
     // documented fix: https://github.com/facebook/react/issues/10389
     el.muted = true;
-    el.play().catch(() => undefined);
-  }, [src]);
+
+    // Calling .play() (and seeking) before the browser has loaded metadata can silently no-op in
+    // some browsers rather than queuing — wait for loadedmetadata when it isn't ready yet.
+    const start = () => {
+      if (startAt > 0) {
+        try {
+          el.currentTime = startAt;
+        } catch {
+          // Seeking can throw if metadata genuinely isn't ready despite readyState; play() below
+          // will still work, just from frame 0.
+        }
+      }
+      el.play().catch(() => undefined);
+    };
+
+    if (el.readyState >= 1) {
+      start();
+    } else {
+      el.addEventListener("loadedmetadata", start, { once: true });
+      return () => el.removeEventListener("loadedmetadata", start);
+    }
+  }, [src, startAt]);
 
   return (
     <video
@@ -230,7 +250,7 @@ function EasterEggOverlay({ sessionId }: { sessionId: number }) {
           />
         </>
       ) : phase === "video1" ? (
-        <EasterEggVideo src="/videos/wake-up-bg.mp4" onEnded={() => setPhase("video2")} />
+        <EasterEggVideo src="/videos/wake-up-bg.mp4" startAt={3} onEnded={() => setPhase("video2")} />
       ) : (
         <EasterEggVideo src="/videos/wake-up-cue.mp4" onEnded={revertOverlay} />
       )}
