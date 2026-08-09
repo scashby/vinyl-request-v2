@@ -153,6 +153,31 @@ function VinylCascade() {
 }
 
 // One-off "Wake Up" jumbotron override for session BWDA85 only — safe to remove after that event.
+function EasterEggVideo({ src, onEnded }: { src: string; onEnded: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    // React's `muted` JSX prop only sets the attribute, not the live DOM property, so by the time
+    // autoplay is evaluated the browser can see it as unmuted and block it (silently showing the
+    // native play button instead of playing). Setting .muted imperatively before .play() is the
+    // documented fix: https://github.com/facebook/react/issues/10389
+    el.muted = true;
+    el.play().catch(() => undefined);
+  }, [src]);
+
+  return (
+    <video
+      ref={videoRef}
+      className="absolute inset-0 h-full w-full object-cover"
+      src={src}
+      playsInline
+      onEnded={onEnded}
+    />
+  );
+}
+
 function EasterEggOverlay({ sessionId }: { sessionId: number }) {
   const [phase, setPhase] = useState<"glitch" | "video1" | "video2">("glitch");
 
@@ -205,23 +230,9 @@ function EasterEggOverlay({ sessionId }: { sessionId: number }) {
           />
         </>
       ) : phase === "video1" ? (
-        <video
-          className="absolute inset-0 h-full w-full object-cover"
-          src="/videos/wake-up-bg.mp4"
-          autoPlay
-          muted
-          playsInline
-          onEnded={() => setPhase("video2")}
-        />
+        <EasterEggVideo src="/videos/wake-up-bg.mp4" onEnded={() => setPhase("video2")} />
       ) : (
-        <video
-          className="absolute inset-0 h-full w-full object-cover"
-          src="/videos/wake-up-cue.mp4"
-          autoPlay
-          muted
-          playsInline
-          onEnded={revertOverlay}
-        />
+        <EasterEggVideo src="/videos/wake-up-cue.mp4" onEnded={revertOverlay} />
       )}
     </div>
   );
