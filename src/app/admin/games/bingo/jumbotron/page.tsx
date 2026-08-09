@@ -152,6 +152,81 @@ function VinylCascade() {
   );
 }
 
+// One-off "Wake Up" jumbotron override for session BWDA85 only — safe to remove after that event.
+function EasterEggOverlay({ sessionId }: { sessionId: number }) {
+  const [phase, setPhase] = useState<"glitch" | "video1" | "video2">("glitch");
+
+  useEffect(() => {
+    if (phase !== "glitch") return;
+    const timer = setTimeout(() => setPhase("video1"), 1000);
+    return () => clearTimeout(timer);
+  }, [phase]);
+
+  const revertOverlay = useCallback(() => {
+    void fetch(`/api/games/bingo/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bingo_overlay: "none" }),
+    });
+  }, [sessionId]);
+
+  return (
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black">
+      {phase === "glitch" ? (
+        <>
+          <style>{`
+            @keyframes glitch-shift {
+              0%   { transform: translate(0, 0); }
+              20%  { transform: translate(-1.2vw, 0.3vh); }
+              40%  { transform: translate(1vw, -0.4vh); }
+              60%  { transform: translate(-0.6vw, 0.5vh); }
+              80%  { transform: translate(0.8vw, -0.2vh); }
+              100% { transform: translate(0, 0); }
+            }
+            @keyframes glitch-flicker {
+              0%, 19%, 21%, 49%, 51%, 79%, 81%, 100% { opacity: 1; }
+              20%, 50%, 80% { opacity: 0.55; }
+            }
+          `}</style>
+          <div
+            className="absolute inset-0 bg-red-600 mix-blend-screen"
+            style={{ animation: "glitch-shift 0.28s steps(2, end) infinite" }}
+          />
+          <div
+            className="absolute inset-0 bg-cyan-500 mix-blend-screen"
+            style={{ animation: "glitch-shift 0.22s steps(2, end) infinite reverse" }}
+          />
+          <div
+            className="absolute inset-0 bg-black"
+            style={{
+              backgroundImage: "repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0px, transparent 2px, transparent 4px)",
+              animation: "glitch-flicker 0.4s steps(1, end) infinite",
+            }}
+          />
+        </>
+      ) : phase === "video1" ? (
+        <video
+          className="absolute inset-0 h-full w-full object-cover"
+          src="/videos/wake-up-bg.mp4"
+          autoPlay
+          muted
+          playsInline
+          onEnded={() => setPhase("video2")}
+        />
+      ) : (
+        <video
+          className="absolute inset-0 h-full w-full object-cover"
+          src="/videos/wake-up-cue.mp4"
+          autoPlay
+          muted
+          playsInline
+          onEnded={revertOverlay}
+        />
+      )}
+    </div>
+  );
+}
+
 function BrandingLogos({
   venueLogoUrl,
   venueName,
@@ -379,7 +454,9 @@ export default function BingoJumbotronPage() {
   const showThanks = previewScreen === "thanks" || (previewScreen === null && session?.bingo_overlay === "thanks");
   const showCountdown = previewScreen === null && session?.bingo_overlay === "countdown";
   const showTiebreaker = previewScreen === null && session?.bingo_overlay === "tiebreaker";
-  const showGame = !showWelcome && !showWinner && !showThanks && !showIntermission && !showCountdown && !showTiebreaker;
+  // One-off "Wake Up" jumbotron override for session BWDA85 only — safe to remove after that event.
+  const showEasterEgg = previewScreen === null && session?.bingo_overlay === "easter_egg";
+  const showGame = !showWelcome && !showWinner && !showThanks && !showIntermission && !showCountdown && !showTiebreaker && !showEasterEgg;
   const useLightScreenTheme = showWelcome || showWinner || showThanks || showIntermission || showCountdown || showTiebreaker;
 
   const welcomeContent = useMemo(() => {
@@ -643,6 +720,8 @@ export default function BingoJumbotronPage() {
             ) : null}
           </div>
         </div>
+      ) : showEasterEgg ? (
+        <EasterEggOverlay sessionId={sessionId} />
       ) : (
         <>
           <div className="grid min-h-screen grid-rows-[auto_1fr_auto] gap-[1.2vw] p-[1.6vw]">

@@ -423,6 +423,13 @@ export default function BingoHostPage() {
     setSavingOverlay(false);
   };
 
+  // One-off "Wake Up" jumbotron override for session BWDA85 only — safe to remove after that event.
+  const fireEasterEgg = async () => {
+    setSavingOverlay(true);
+    await patchSession({ bingo_overlay: "easter_egg" });
+    setSavingOverlay(false);
+  };
+
   const toggleTie = async () => {
     if (!session) return;
 
@@ -745,6 +752,16 @@ export default function BingoHostPage() {
                 >
                   Bingo Winner!
                 </button>
+                {session?.session_code === "BWDA85" ? (
+                  <button
+                    onClick={() => void fireEasterEgg()}
+                    disabled={savingOverlay}
+                    title="One-off Wake Up jumbotron override for this session"
+                    className="rounded border border-red-500 bg-red-900/40 px-3 py-1 font-bold text-red-200 hover:bg-red-900/70 disabled:opacity-50"
+                  >
+                    🎸 Wake Up
+                  </button>
+                ) : null}
                 </div>
 
                 <div className="flex items-center gap-1 rounded border border-stone-700/80 bg-stone-950/50 px-2 py-1">
