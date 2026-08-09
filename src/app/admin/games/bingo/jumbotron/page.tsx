@@ -155,6 +155,10 @@ function VinylCascade() {
 // One-off "Wake Up" jumbotron override for session BWDA85 only — safe to remove after that event.
 function EasterEggVideo({ src, onEnded }: { src: string; onEnded: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  // Starts transparent and fades in over the shared black background, so switching between the
+  // glitch effect and each clip (and between the two clips) is a smooth dissolve instead of an
+  // instant hard cut — which otherwise reads as another glitch.
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -165,12 +169,14 @@ function EasterEggVideo({ src, onEnded }: { src: string; onEnded: () => void }) 
     // documented fix: https://github.com/facebook/react/issues/10389
     el.muted = true;
     el.play().catch(() => undefined);
+    const raf = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(raf);
   }, [src]);
 
   return (
     <video
       ref={videoRef}
-      className="absolute inset-0 h-full w-full object-cover"
+      className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ease-in-out ${visible ? "opacity-100" : "opacity-0"}`}
       src={src}
       playsInline
       onEnded={onEnded}
@@ -178,7 +184,7 @@ function EasterEggVideo({ src, onEnded }: { src: string; onEnded: () => void }) 
   );
 }
 
-function EasterEggOverlay({ sessionId }: { sessionId: number }) {
+function EasterEggOverlay({ sessionId, returnOverlay }: { sessionId: number; returnOverlay: string }) {
   const [phase, setPhase] = useState<"glitch" | "video1" | "video2">("glitch");
 
   useEffect(() => {
@@ -191,9 +197,9 @@ function EasterEggOverlay({ sessionId }: { sessionId: number }) {
     void fetch(`/api/games/bingo/sessions/${sessionId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bingo_overlay: "none" }),
+      body: JSON.stringify({ bingo_overlay: returnOverlay }),
     });
-  }, [sessionId]);
+  }, [sessionId, returnOverlay]);
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black">
@@ -311,6 +317,10 @@ export default function BingoJumbotronPage() {
   const previewVenueName = searchParams.get("previewVenueName")?.trim() || null;
   const containerRef = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState<Session | null>(null);
+  // One-off "Wake Up" jumbotron override for session BWDA85 only — remembers whatever overlay
+  // (welcome, countdown, none, etc.) was showing right before the override fired, so it can
+  // return to that exact screen afterward instead of always dropping back to the plain grid.
+  const preEasterEggOverlayRef = useRef<string>("none");
   const [calls, setCalls] = useState<Call[]>([]);
   const [remaining, setRemaining] = useState(0);
   const [now, setNow] = useState(() => Date.now());
@@ -326,6 +336,9 @@ export default function BingoJumbotronPage() {
 
     if (sRes.ok) {
       const payload = await sRes.json();
+      if (payload.bingo_overlay !== "easter_egg") {
+        preEasterEggOverlayRef.current = payload.bingo_overlay ?? "none";
+      }
       setSession(payload);
       setRemaining(payload.seconds_to_next_call ?? 0);
     }
@@ -738,7 +751,7 @@ export default function BingoJumbotronPage() {
           </div>
         </div>
       ) : showEasterEgg ? (
-        <EasterEggOverlay sessionId={sessionId} />
+        <EasterEggOverlay sessionId={sessionId} returnOverlay={preEasterEggOverlayRef.current} />
       ) : (
         <>
           <div className="grid min-h-screen grid-rows-[auto_1fr_auto] gap-[1.2vw] p-[1.6vw]">
