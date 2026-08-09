@@ -669,6 +669,17 @@ export default function BingoHostPage() {
                 </button>
               </div>
 
+              {session?.session_code === "BWDA85" || session?.sandbox_source_session_id === 28 ? (
+                <button
+                  onClick={() => void fireEasterEgg()}
+                  disabled={savingOverlay}
+                  title="One-off Wake Up jumbotron override for this session — fire right as the welcome screen ends and the needle drops"
+                  className="w-full rounded border border-red-500 bg-red-900/40 px-3 py-1 font-bold text-red-200 hover:bg-red-900/70 disabled:opacity-50"
+                >
+                  🎸 Wake Up
+                </button>
+              ) : null}
+
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => void startGame()}
@@ -752,16 +763,6 @@ export default function BingoHostPage() {
                 >
                   Bingo Winner!
                 </button>
-                {session?.session_code === "BWDA85" || session?.sandbox_source_session_id === 28 ? (
-                  <button
-                    onClick={() => void fireEasterEgg()}
-                    disabled={savingOverlay}
-                    title="One-off Wake Up jumbotron override for this session"
-                    className="rounded border border-red-500 bg-red-900/40 px-3 py-1 font-bold text-red-200 hover:bg-red-900/70 disabled:opacity-50"
-                  >
-                    🎸 Wake Up
-                  </button>
-                ) : null}
                 </div>
 
                 <div className="flex items-center gap-1 rounded border border-stone-700/80 bg-stone-950/50 px-2 py-1">
