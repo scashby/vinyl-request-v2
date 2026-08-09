@@ -515,70 +515,11 @@ function collectWinningLineCells(
   return [];
 }
 
-export async function validateCardByIdentifier(
+async function buildCardMarkChecker(
   db: BingoDbClient,
   sessionId: number,
-  cardIdentifier: string,
-  roundOverride?: number
-): Promise<BingoCardValidationResult> {
-  const { data: session, error: sessionError } = await db
-    .from("bingo_sessions")
-    .select("current_round, game_mode, round_modes, is_sandbox, sandbox_source_session_id")
-    .eq("id", sessionId)
-    .maybeSingle();
-
-  if (sessionError) throw new Error(sessionError.message);
-  if (!session) throw new Error("Session not found.");
-
-  let card: { session_id: number; card_identifier: string; grid: unknown } | null = null;
-  const { data: sessionCard, error: sessionCardError } = await db
-    .from("bingo_cards")
-    .select("session_id, card_identifier, grid")
-    .eq("session_id", sessionId)
-    .eq("card_identifier", cardIdentifier)
-    .maybeSingle();
-
-  if (sessionCardError) throw new Error(sessionCardError.message);
-  if (sessionCard) {
-    card = sessionCard as { session_id: number; card_identifier: string; grid: unknown };
-  } else {
-    const isSandbox = Boolean((session as { is_sandbox?: unknown }).is_sandbox);
-    const sourceSessionId = Number((session as { sandbox_source_session_id?: unknown }).sandbox_source_session_id);
-    if (isSandbox && Number.isFinite(sourceSessionId)) {
-      const { data: sourceCard, error: sourceCardError } = await db
-        .from("bingo_cards")
-        .select("session_id, card_identifier, grid")
-        .eq("session_id", sourceSessionId)
-        .eq("card_identifier", cardIdentifier)
-        .maybeSingle();
-
-      if (sourceCardError) throw new Error(sourceCardError.message);
-      if (sourceCard) {
-        card = sourceCard as { session_id: number; card_identifier: string; grid: unknown };
-      }
-    }
-  }
-
-  if (!card) {
-    const { data: fallbackCards, error: fallbackError } = await db
-      .from("bingo_cards")
-      .select("session_id, card_identifier, grid")
-      .eq("card_identifier", cardIdentifier)
-      .limit(1);
-
-    if (fallbackError) throw new Error(fallbackError.message);
-    if (Array.isArray(fallbackCards) && fallbackCards.length > 0) {
-      card = fallbackCards[0] as { session_id: number; card_identifier: string; grid: unknown };
-    }
-  }
-
-  if (!card) throw new Error("Card not found for this session.");
-
-  const round = roundOverride && Number.isFinite(roundOverride)
-    ? Math.max(1, Math.floor(roundOverride))
-    : Math.max(1, Number(session.current_round ?? 1));
-  const activeModes = getModesForRound(session.round_modes as { round: number; modes: GameMode[] }[] | null, round, (session.game_mode as GameMode) ?? "single_line");
-
+  session: { is_sandbox?: unknown; sandbox_source_session_id?: unknown }
+): Promise<(cell: ValidationCell) => boolean> {
   const { data: calls, error: callsError } = await db
     .from("bingo_session_calls")
     .select("id, call_index, status, track_title, artist_name")
@@ -598,8 +539,8 @@ export async function validateCardByIdentifier(
       .filter((key) => key.length > 0)
   );
 
-  const isSandbox = Boolean((session as { is_sandbox?: unknown }).is_sandbox);
-  const sourceSessionId = Number((session as { sandbox_source_session_id?: unknown }).sandbox_source_session_id);
+  const isSandbox = Boolean(session.is_sandbox);
+  const sourceSessionId = Number(session.sandbox_source_session_id);
   if (isSandbox && Number.isFinite(sourceSessionId)) {
     const { data: sourceCalls, error: sourceCallsError } = await db
       .from("bingo_session_calls")
@@ -629,7 +570,7 @@ export async function validateCardByIdentifier(
     if (key) calledTrackKeys.add(key);
   });
 
-  const isCellMarked = (cell: ValidationCell): boolean => {
+  return (cell: ValidationCell): boolean => {
     if (cell.free) return true;
 
     const cellTrackKey = buildTrackIdentity(cell.track_title, cell.artist_name);
@@ -643,9 +584,14 @@ export async function validateCardByIdentifier(
 
     return cellTrackKey.length > 0 && calledTrackKeys.has(cellTrackKey);
   };
+}
 
-  const grid = coerceCardGrid((card as { grid?: unknown }).grid);
-  const linePatterns = buildLinePatterns(grid);
+function evaluateActiveModesWinner(
+  activeModes: GameMode[],
+  grid: ValidationCell[],
+  linePatterns: ValidationPattern[],
+  isCellMarked: (cell: ValidationCell) => boolean
+): { winningPatterns: Array<{ mode: GameMode; label: string }>; mistakes: BingoCardValidationResult["mistakes"] } {
   const winningPatterns: Array<{ mode: GameMode; label: string }> = [];
   const mistakes: BingoCardValidationResult["mistakes"] = [];
 
@@ -718,6 +664,148 @@ export async function validateCardByIdentifier(
       });
     }
   }
+
+  return { winningPatterns, mistakes };
+}
+
+export type BingoWinningCardsSummary = {
+  session_id: number;
+  round: number;
+  active_modes: GameMode[];
+  total_cards: number;
+  winning_card_count: number;
+  winning_card_identifiers: string[];
+};
+
+export async function countWinningCards(
+  db: BingoDbClient,
+  sessionId: number,
+  roundOverride?: number
+): Promise<BingoWinningCardsSummary> {
+  const { data: session, error: sessionError } = await db
+    .from("bingo_sessions")
+    .select("current_round, game_mode, round_modes, is_sandbox, sandbox_source_session_id")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (sessionError) throw new Error(sessionError.message);
+  if (!session) throw new Error("Session not found.");
+
+  const round = roundOverride && Number.isFinite(roundOverride)
+    ? Math.max(1, Math.floor(roundOverride))
+    : Math.max(1, Number(session.current_round ?? 1));
+  const activeModes = getModesForRound(session.round_modes as { round: number; modes: GameMode[] }[] | null, round, (session.game_mode as GameMode) ?? "single_line");
+
+  const isCellMarked = await buildCardMarkChecker(
+    db,
+    sessionId,
+    session as { is_sandbox?: unknown; sandbox_source_session_id?: unknown }
+  );
+
+  const { data: cards, error: cardsError } = await db
+    .from("bingo_cards")
+    .select("card_identifier, grid")
+    .eq("session_id", sessionId);
+
+  if (cardsError) throw new Error(cardsError.message);
+  const cardRows = (cards ?? []) as Array<{ card_identifier: string; grid: unknown }>;
+
+  let winningCount = 0;
+  const winningIdentifiers: string[] = [];
+
+  for (const cardRow of cardRows) {
+    const grid = coerceCardGrid(cardRow.grid);
+    const linePatterns = buildLinePatterns(grid);
+    const { winningPatterns } = evaluateActiveModesWinner(activeModes, grid, linePatterns, isCellMarked);
+    if (winningPatterns.length > 0) {
+      winningCount += 1;
+      winningIdentifiers.push(cardRow.card_identifier);
+    }
+  }
+
+  return {
+    session_id: sessionId,
+    round,
+    active_modes: activeModes,
+    total_cards: cardRows.length,
+    winning_card_count: winningCount,
+    winning_card_identifiers: winningIdentifiers,
+  };
+}
+
+export async function validateCardByIdentifier(
+  db: BingoDbClient,
+  sessionId: number,
+  cardIdentifier: string,
+  roundOverride?: number
+): Promise<BingoCardValidationResult> {
+  const { data: session, error: sessionError } = await db
+    .from("bingo_sessions")
+    .select("current_round, game_mode, round_modes, is_sandbox, sandbox_source_session_id")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (sessionError) throw new Error(sessionError.message);
+  if (!session) throw new Error("Session not found.");
+
+  let card: { session_id: number; card_identifier: string; grid: unknown } | null = null;
+  const { data: sessionCard, error: sessionCardError } = await db
+    .from("bingo_cards")
+    .select("session_id, card_identifier, grid")
+    .eq("session_id", sessionId)
+    .eq("card_identifier", cardIdentifier)
+    .maybeSingle();
+
+  if (sessionCardError) throw new Error(sessionCardError.message);
+  if (sessionCard) {
+    card = sessionCard as { session_id: number; card_identifier: string; grid: unknown };
+  } else {
+    const isSandbox = Boolean((session as { is_sandbox?: unknown }).is_sandbox);
+    const sourceSessionId = Number((session as { sandbox_source_session_id?: unknown }).sandbox_source_session_id);
+    if (isSandbox && Number.isFinite(sourceSessionId)) {
+      const { data: sourceCard, error: sourceCardError } = await db
+        .from("bingo_cards")
+        .select("session_id, card_identifier, grid")
+        .eq("session_id", sourceSessionId)
+        .eq("card_identifier", cardIdentifier)
+        .maybeSingle();
+
+      if (sourceCardError) throw new Error(sourceCardError.message);
+      if (sourceCard) {
+        card = sourceCard as { session_id: number; card_identifier: string; grid: unknown };
+      }
+    }
+  }
+
+  if (!card) {
+    const { data: fallbackCards, error: fallbackError } = await db
+      .from("bingo_cards")
+      .select("session_id, card_identifier, grid")
+      .eq("card_identifier", cardIdentifier)
+      .limit(1);
+
+    if (fallbackError) throw new Error(fallbackError.message);
+    if (Array.isArray(fallbackCards) && fallbackCards.length > 0) {
+      card = fallbackCards[0] as { session_id: number; card_identifier: string; grid: unknown };
+    }
+  }
+
+  if (!card) throw new Error("Card not found for this session.");
+
+  const round = roundOverride && Number.isFinite(roundOverride)
+    ? Math.max(1, Math.floor(roundOverride))
+    : Math.max(1, Number(session.current_round ?? 1));
+  const activeModes = getModesForRound(session.round_modes as { round: number; modes: GameMode[] }[] | null, round, (session.game_mode as GameMode) ?? "single_line");
+
+  const isCellMarked = await buildCardMarkChecker(
+    db,
+    sessionId,
+    session as { is_sandbox?: unknown; sandbox_source_session_id?: unknown }
+  );
+
+  const grid = coerceCardGrid((card as { grid?: unknown }).grid);
+  const linePatterns = buildLinePatterns(grid);
+  const { winningPatterns, mistakes } = evaluateActiveModesWinner(activeModes, grid, linePatterns, isCellMarked);
 
   const actualFreeSquareCount = grid.filter((cell) => cell.free).length;
   const markedSquareCount = grid.filter((cell) => isCellMarked(cell)).length;

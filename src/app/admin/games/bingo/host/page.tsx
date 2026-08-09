@@ -82,6 +82,14 @@ type CardValidationResponse = {
   }>;
 };
 
+type WinningCardsSummary = {
+  round: number;
+  active_modes: GameMode[];
+  total_cards: number;
+  winning_card_count: number;
+  winning_card_identifiers: string[];
+};
+
 export default function BingoHostPage() {
   const searchParams = useSearchParams();
   const sessionId = Number(searchParams.get("sessionId"));
@@ -102,6 +110,8 @@ export default function BingoHostPage() {
   const [winnerCheckResult, setWinnerCheckResult] = useState<CardValidationResponse | null>(null);
   const [winnerCheckError, setWinnerCheckError] = useState<string | null>(null);
   const [checkingWinner, setCheckingWinner] = useState(false);
+  const [winningCards, setWinningCards] = useState<WinningCardsSummary | null>(null);
+  const [winningCardsListOpen, setWinningCardsListOpen] = useState(false);
   const [jumbotronCopyStatus, setJumbotronCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const currentCallRowRef = useRef<HTMLTableRowElement>(null);
   const autoCallLockRef = useRef(false);
@@ -140,10 +150,11 @@ export default function BingoHostPage() {
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
     if (typeof document !== "undefined" && document.hidden) return;
-    const [sRes, cRes, playlistsRes] = await Promise.all([
+    const [sRes, cRes, playlistsRes, winningCardsRes] = await Promise.all([
       fetch(`/api/games/bingo/sessions/${sessionId}`, { cache: 'no-store' }),
       fetch(`/api/games/bingo/sessions/${sessionId}/calls`, { cache: 'no-store' }),
       fetch(`/api/games/bingo/sessions/${sessionId}/crates`, { cache: 'no-store' }),
+      fetch(`/api/games/bingo/sessions/${sessionId}/winning-cards`, { cache: 'no-store' }),
     ]);
 
     if (sRes.ok) {
@@ -181,6 +192,11 @@ export default function BingoHostPage() {
     if (playlistsRes.ok) {
       const payload = await playlistsRes.json();
       setGamePlaylists(payload.data ?? []);
+    }
+
+    if (winningCardsRes.ok) {
+      const payload = await winningCardsRes.json();
+      setWinningCards(payload as WinningCardsSummary);
     }
   }, [sessionId]);
 
@@ -737,6 +753,27 @@ export default function BingoHostPage() {
             {/* Center column: Bingo Pending / Check / Tie / Winner */}
             <div className="min-w-0 space-y-2 text-xs">
               <div className="mx-auto flex w-fit flex-col items-center gap-2">
+                <button
+                  onClick={() => setWinningCardsListOpen((open) => !open)}
+                  disabled={!winningCards || winningCards.winning_card_count === 0}
+                  className={`w-full rounded border px-3 py-2 text-center transition disabled:cursor-default ${
+                    winningCards && winningCards.winning_card_count > 0
+                      ? "border-emerald-500 bg-emerald-900/40 text-emerald-100 hover:bg-emerald-900/60"
+                      : "border-stone-700 bg-stone-950/40 text-stone-400"
+                  }`}
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em]">Winning Cards</p>
+                  <p className="text-lg font-black tabular-nums">
+                    {winningCards ? winningCards.winning_card_count : "–"} / {winningCards ? winningCards.total_cards : "–"}
+                  </p>
+                </button>
+                {winningCardsListOpen && winningCards && winningCards.winning_card_count > 0 ? (
+                  <div className="w-full rounded border border-emerald-800/70 bg-emerald-950/30 p-2 text-[11px] text-emerald-100">
+                    {winningCards.winning_card_identifiers.map((identifier) => (
+                      <p key={identifier} className="tabular-nums">{identifier}</p>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="flex items-center gap-2">
                 <button
                   onClick={() => void setOverlay("pending")}
