@@ -752,7 +752,7 @@ export default function BingoHostPage() {
                 >
                   Bingo Winner!
                 </button>
-                {session?.session_code === "BWDA85" ? (
+                {session?.session_code === "BWDA85" || session?.sandbox_source_session_id === 28 ? (
                   <button
                     onClick={() => void fireEasterEgg()}
                     disabled={savingOverlay}
