@@ -153,8 +153,18 @@ function VinylCascade() {
 }
 
 // One-off "Wake Up" jumbotron override for session BWDA85 only — safe to remove after that event.
+// TEMPORARY diagnostic overlay — remove once playback is confirmed working live.
+function EasterEggDebugReadout({ status }: { status: string }) {
+  return (
+    <div className="pointer-events-none absolute bottom-4 left-4 z-[95] rounded bg-black/80 px-2 py-1 font-mono text-[11px] text-lime-400">
+      {status}
+    </div>
+  );
+}
+
 function EasterEggVideo({ src, startAt = 0, onEnded }: { src: string; startAt?: number; onEnded: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [debugStatus, setDebugStatus] = useState("mounting…");
 
   useEffect(() => {
     const el = videoRef.current;
@@ -176,25 +186,41 @@ function EasterEggVideo({ src, startAt = 0, onEnded }: { src: string; startAt?: 
           // will still work, just from frame 0.
         }
       }
-      el.play().catch(() => undefined);
+      el
+        .play()
+        .then(() => setDebugStatus("play() resolved"))
+        .catch((err: unknown) => setDebugStatus(`play() rejected: ${err instanceof Error ? err.message : String(err)}`));
     };
 
     if (el.readyState >= 1) {
       start();
     } else {
       el.addEventListener("loadedmetadata", start, { once: true });
-      return () => el.removeEventListener("loadedmetadata", start);
     }
+
+    const tick = window.setInterval(() => {
+      setDebugStatus(
+        `t=${el.currentTime.toFixed(2)}s dur=${Number.isFinite(el.duration) ? el.duration.toFixed(1) : "?"} paused=${el.paused} readyState=${el.readyState} networkState=${el.networkState}${el.error ? ` ERROR=${el.error.code}:${el.error.message}` : ""}`
+      );
+    }, 500);
+
+    return () => {
+      el.removeEventListener("loadedmetadata", start);
+      window.clearInterval(tick);
+    };
   }, [src, startAt]);
 
   return (
-    <video
-      ref={videoRef}
-      className="absolute inset-0 h-full w-full object-cover"
-      src={src}
-      playsInline
-      onEnded={onEnded}
-    />
+    <>
+      <video
+        ref={videoRef}
+        className="absolute inset-0 h-full w-full object-cover"
+        src={src}
+        playsInline
+        onEnded={onEnded}
+      />
+      <EasterEggDebugReadout status={`${src.split("/").pop()}: ${debugStatus}`} />
+    </>
   );
 }
 
