@@ -264,6 +264,9 @@ export default function BingoHostPage() {
       });
       if (response.ok) {
         emitBingoSessionSync(sessionId);
+      } else {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        alert(payload?.error ?? "Failed to update session");
       }
       await load();
     },
