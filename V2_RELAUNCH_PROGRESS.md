@@ -61,6 +61,24 @@ merging to `main`.
   Pop Poster's "Get Directions" button was invisible because its background
   matched the residency band's background exactly — added a dedicated
   contrast-safe token pair rather than reusing ink/bg universally).
+- **Admin login redirect bug**: magic link never passed `emailRedirectTo`,
+  so it (and, separately, Google OAuth whenever the target URL wasn't on
+  Supabase's Redirect URLs allowlist) fell back to the account's Site URL —
+  in practice, logging in from a preview deployment could land you in
+  **production's** live admin panel instead. Magic link fixed in code
+  (`6afd16ee`); the Google OAuth side needed a Supabase dashboard change
+  (Redirect URLs allowlist), which is done — verified directly with a
+  scripted login rather than by asking for manual re-testing.
+- **`/admin/edit-home` Connect section layout bug**: the URL field next to
+  each social link name rendered as an unreadable sliver. Root cause was a
+  Tailwind specificity tie — the Name input carried both the shared
+  `inputClass`'s `w-full` and its own `w-32` override, and Tailwind's
+  fixed internal utility ordering (not source order) let `w-full` win, so
+  Name ate the row and URL got crushed trying to shrink around it. Fixed
+  with `!w-32` (`1462bbe7`) and confirmed three independent ways against
+  the exact deployed commit: compiled CSS output, DOM measurements via a
+  scripted authenticated session, and a screenshot — not by asking for
+  manual re-verification.
 
 **📋 PLANNED / BACKLOG:**
 - Extend the section/content model + admin editing to About → Book,
