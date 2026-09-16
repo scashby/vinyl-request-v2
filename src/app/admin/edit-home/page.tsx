@@ -422,7 +422,7 @@ export default function EditHomePage() {
                   }}
                 />
                 <input
-                  className={inputClass}
+                  className={`${inputClass} flex-1 min-w-0`}
                   placeholder="URL"
                   value={social.url}
                   onChange={(e) => {
