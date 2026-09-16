@@ -21,10 +21,10 @@ export function ConnectSection({
   return (
     <Container size="xl">
       <div className="text-center pb-16 md:pb-20">
-        <div className="font-[family-name:var(--font-alfa-slab)] text-2xl md:text-[30px] text-[#2A2118] mb-2.5">
+        <div className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-2xl md:text-[30px] text-[var(--dwd-ink)] mb-2.5">
           {data.heading}
         </div>
-        <div className="text-base text-[#6B5B45] mb-9">{data.subhead}</div>
+        <div className="text-base text-[var(--dwd-ink-faint)] mb-9">{data.subhead}</div>
         <div className="flex justify-center gap-4 flex-wrap mb-11">
           {data.socials.map(({ name, url }) => {
             const Icon = getSocialIcon(name);
@@ -35,7 +35,7 @@ export function ConnectSection({
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={name}
-                className="w-12 h-12 rounded-full bg-[#2A2118] text-[#FAF1E1] flex items-center justify-center hover:-translate-y-0.5 hover:-rotate-[4deg] transition-transform"
+                className="w-12 h-12 rounded-full bg-[var(--dwd-ink)] text-[var(--dwd-bg)] flex items-center justify-center hover:-translate-y-0.5 hover:-rotate-[4deg] transition-transform"
               >
                 <Icon size={20} />
               </a>
@@ -44,16 +44,16 @@ export function ConnectSection({
         </div>
 
         <div
-          className="max-w-xl mx-auto bg-[#2A2118] rounded-xl px-7 py-6 flex items-center gap-4 text-left -rotate-[0.5deg]"
-          style={{ boxShadow: '8px 8px 0 rgba(42,33,24,0.10)' }}
+          className="max-w-xl mx-auto rounded-xl px-7 py-6 flex items-center gap-4 text-left -rotate-[0.5deg] bg-[var(--dwd-ink)]"
+          style={{ boxShadow: '8px 8px 0 rgba(0,0,0,0.10)' }}
         >
-          <div className="w-11 h-11 rounded-full bg-[#2F7A78] flex items-center justify-center flex-shrink-0">
-            <SiSpotify size={18} color="#FAF1E1" />
+          <div className="w-11 h-11 rounded-full bg-[var(--dwd-accent-2)] flex items-center justify-center flex-shrink-0">
+            <SiSpotify size={18} color="var(--dwd-bg)" />
           </div>
           <div className="min-w-0">
             {spotifyPlaylist ? (
               <div
-                className="text-sm text-[#FAF1E1] [&_iframe]:rounded-lg [&_iframe]:w-full"
+                className="text-sm text-[var(--dwd-bg)] [&_iframe]:rounded-lg [&_iframe]:w-full"
                 dangerouslySetInnerHTML={{
                   __html: (spotifyPlaylist.embed_html || spotifyPlaylist.embed_url || '').replace(
                     /allowfullscreen="?"?/g,
@@ -63,8 +63,8 @@ export function ConnectSection({
               />
             ) : (
               <>
-                <div className="text-sm font-bold text-[#FAF1E1]">{data.spotify_fallback_label}</div>
-                <div className="text-xs text-[#D8C9AE]">{data.spotify_fallback_sublabel}</div>
+                <div className="text-sm font-bold text-[var(--dwd-bg)]">{data.spotify_fallback_label}</div>
+                <div className="text-xs text-[var(--dwd-bg)] opacity-70">{data.spotify_fallback_sublabel}</div>
               </>
             )}
           </div>

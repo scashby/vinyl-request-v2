@@ -43,18 +43,26 @@ merging to `main`.
   already carries `position` and `visible`, even though reorder/add/remove
   *UI* isn't built yet — this pass is content editing only.
 
-  **⚠️ Action needed:** run `sql/create-homepage-sections.sql` in the
-  Supabase SQL editor (production DB) to create the table and seed it — the
-  site works fine without it (shows the same content via fallback defaults),
-  but `/admin/edit-home` can't save anything until that table exists.
+  **✅ Migration applied** — `homepage_sections` exists on the production DB
+  and is seeded; `/admin/edit-home` saves for real. (Direct Postgres access
+  is now set up for running future migrations from a session — see local
+  memory, not committed to the repo.)
+- **Theme system**: the three explored directions (Sunday Matinee, Bright
+  Pop Poster, Community Dial) are now formalized as swappable design-token
+  presets in `src/lib/theme.ts` — colors, fonts, *and* the structural
+  details that make each direction distinct (card rotation/shadow/border,
+  hero badge shape, headline case). Every themed component (all homepage
+  sections, nav, footer) reads `var(--dwd-*)` CSS custom properties instead
+  of literal values, so switching themes never touches component code.
+  Active theme is stored in the existing `admin_settings` key/value table
+  (key `theme:active`) and switchable from a picker at the top of
+  **`/admin/edit-home`** — takes effect immediately, site-wide. Verified all
+  three render correctly (including catching and fixing a real bug: Bright
+  Pop Poster's "Get Directions" button was invisible because its background
+  matched the residency band's background exactly — added a dedicated
+  contrast-safe token pair rather than reusing ink/bg universally).
 
 **📋 PLANNED / BACKLOG:**
-- Theme system: formalize the three explored directions (Sunday Matinee,
-  Bright Pop Poster, Community Dial) into swappable design-token presets
-  with an admin theme switcher, so any of the three can be made "active"
-  site-wide without a rebuild. Colors/fonts are currently inline per
-  component, not yet centralized into token files — that centralization is
-  part of this next step, not done yet.
 - Extend the section/content model + admin editing to About → Book,
   Dialogues, and Merch → Connect.
 - Trim the nav/sitemap (currently unchanged this pass): fold or demote
@@ -76,7 +84,15 @@ merging to `main`.
   existing tables/feeds (`events`, Substack via `/api/wordpress`, the
   `playlists` table) — only the *static* homepage copy moves into the new
   content model.
-- Admin write routes (`/api/homepage-sections/[id]`) follow this repo's
-  existing convention of relying on the `/admin` client-side session gate
-  rather than per-request server-side auth — matches `about-content` and
-  other existing admin API routes, not a new gap introduced here.
+- Admin write routes (`/api/homepage-sections/[id]`, `/api/site-theme`)
+  follow this repo's existing convention of relying on the `/admin`
+  client-side session gate rather than per-request server-side auth —
+  matches `about-content` and other existing admin API routes, not a new
+  gap introduced here.
+- **Theming via CSS custom properties, not per-theme component variants.**
+  `src/lib/theme.ts` computes a flat bag of `--dwd-*` values (including
+  ones derived from higher-level fields, e.g. badge background/border
+  derived from `badgeVariant`) and applies them once at each themed
+  component's root via inline `style`. Components never branch on theme
+  name — this is what makes adding a fourth theme later a `theme.ts`-only
+  change.

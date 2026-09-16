@@ -4,7 +4,17 @@ import './globals.css';
 import { AuthProvider } from '../components/AuthProvider';
 import NavigationMenu from '../components/NavigationMenu';
 import Footer from '../components/Footer';
-import { Alfa_Slab_One, Inter, Libre_Barcode_EAN13_Text, Playfair_Display, Work_Sans } from 'next/font/google';
+import {
+  Alfa_Slab_One,
+  Archivo,
+  Archivo_Black,
+  Inter,
+  Karla,
+  Libre_Barcode_EAN13_Text,
+  Playfair_Display,
+  Space_Grotesk,
+  Work_Sans,
+} from 'next/font/google';
 // FIXED: Named import
 
 const inter = Inter({
@@ -25,6 +35,9 @@ const libreBarcode = Libre_Barcode_EAN13_Text({
 
 // Brand type for the v2 redesign (homepage, nav, footer) — kept separate from
 // the site-wide Inter/Playfair pairing so unrestyled pages are unaffected.
+// All three theme directions' fonts load up front (next/font can't pick a
+// Google Font dynamically at runtime); the active theme just decides which
+// --font-* variable the "--dwd-font-*" tokens point at. See src/lib/theme.ts.
 const alfaSlab = Alfa_Slab_One({
   weight: '400',
   subsets: ['latin'],
@@ -34,6 +47,27 @@ const alfaSlab = Alfa_Slab_One({
 const workSans = Work_Sans({
   subsets: ['latin'],
   variable: '--font-work-sans',
+});
+
+const archivoBlack = Archivo_Black({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-archivo-black',
+});
+
+const archivo = Archivo({
+  subsets: ['latin'],
+  variable: '--font-archivo',
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-space-grotesk',
+});
+
+const karla = Karla({
+  subsets: ['latin'],
+  variable: '--font-karla',
 });
 
 export const metadata = {
@@ -57,7 +91,7 @@ export default function RootLayout({
       {/* FIXED: Removed 'bg-black text-white' to stop forced dark mode.
           The app will now use the defaults from globals.css.
       */}
-      <body className={`${inter.variable} ${playfair.variable} ${libreBarcode.variable} ${alfaSlab.variable} ${workSans.variable} font-sans min-h-screen flex flex-col`}>
+      <body className={`${inter.variable} ${playfair.variable} ${libreBarcode.variable} ${alfaSlab.variable} ${workSans.variable} ${archivoBlack.variable} ${archivo.variable} ${spaceGrotesk.variable} ${karla.variable} font-sans min-h-screen flex flex-col`}>
         <AuthProvider>
           {/* REMOVED: AlbumContextManager wrapper (Audio Recognition) */}
           <NavigationMenu />

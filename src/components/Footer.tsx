@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getSocialIcon } from "src/lib/socialIcons";
 import { DEFAULT_SECTIONS, type ConnectData, type HomepageSection } from "src/lib/homeContent";
+import { DEFAULT_THEME, THEMES, isThemeName, toCssVars, type ThemeName } from "src/lib/theme";
 
 // Email is a fixed footer utility link, not part of the editable "socials"
 // list (which is shared with the homepage Connect section via
@@ -13,6 +14,7 @@ const EMAIL_LINK = { name: "Email", url: "mailto:steve@deadwaxdialogues.com" };
 export default function Footer() {
   const pathname = usePathname();
   const [connectData, setConnectData] = useState<ConnectData>(DEFAULT_SECTIONS.connect);
+  const [themeName, setThemeName] = useState<ThemeName>(DEFAULT_THEME);
 
   useEffect(() => {
     fetch("/api/homepage-sections?page=home")
@@ -24,16 +26,29 @@ export default function Footer() {
       .catch((err) => console.error("Error loading footer social links:", err));
   }, []);
 
+  useEffect(() => {
+    fetch("/api/site-theme")
+      .then((res) => res.json())
+      .then((data) => {
+        if (isThemeName(data?.theme)) setThemeName(data.theme);
+      })
+      .catch((err) => console.error("Error loading active theme:", err));
+  }, []);
+
   if (pathname?.startsWith("/admin") || pathname?.startsWith("/edit-collection")) {
     return null;
   }
 
   const links = [...connectData.socials, EMAIL_LINK];
+  const theme = THEMES[themeName];
 
   return (
-    <footer className="bg-[#FAF1E1] text-[#2A2118] w-full border-t border-[#2A2118]/10">
+    <footer
+      className="bg-[var(--dwd-nav-bg)] text-[var(--dwd-ink)] w-full border-t border-[var(--dwd-ink)]/10"
+      style={toCssVars(theme) as React.CSSProperties}
+    >
       <div className="container-responsive py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <span className="text-sm tracking-wide text-[#2A2118]/70 order-2 sm:order-1">
+        <span className="text-sm tracking-wide text-[var(--dwd-ink)]/70 order-2 sm:order-1">
           &copy; {new Date().getFullYear()} Dead Wax Dialogues
         </span>
         <div className="flex gap-2.5 order-1 sm:order-2">
@@ -46,7 +61,7 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={name}
-                className="w-9 h-9 rounded-full bg-[#2A2118]/5 flex items-center justify-center text-[#2A2118]/70 transition-colors duration-200 hover:bg-[#2A2118] hover:text-[#FAF1E1]"
+                className="w-9 h-9 rounded-full bg-[var(--dwd-ink)]/5 flex items-center justify-center text-[var(--dwd-ink)]/70 transition-colors duration-200 hover:bg-[var(--dwd-ink)] hover:text-[var(--dwd-bg)]"
               >
                 <Icon size={16} />
               </a>
@@ -57,4 +72,4 @@ export default function Footer() {
     </footer>
   );
 }
-// AUDIT: restyled for v2 brand palette; now renders site-wide (was previously orphaned), self-hides on admin/edit-collection routes, and pulls social links from the shared homepage content model (src/lib/homeContent.ts) instead of a hardcoded list.
+// AUDIT: restyled for v2 brand palette; renders site-wide, self-hides on admin/edit-collection routes, pulls social links from the shared homepage content model, and is now theme-aware via src/lib/theme.ts.

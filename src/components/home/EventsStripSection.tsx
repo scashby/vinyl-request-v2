@@ -11,7 +11,7 @@ interface EventLite {
   allowed_tags?: string[] | string | null;
 }
 
-const CARD_TILTS = ['-rotate-[1.2deg]', 'rotate-1', '-rotate-[0.6deg]', 'rotate-[1.4deg]'];
+const CARD_TILT_VARS = ['--dwd-tilt-1', '--dwd-tilt-2', '--dwd-tilt-3', '--dwd-tilt-4'];
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
 
 const normalizeStringArray = (value: unknown): string[] => {
@@ -55,35 +55,35 @@ export function EventsStripSection({
     <Container size="xl">
       <div className="mb-16 md:mb-20">
         <div className="flex items-baseline justify-between mb-7">
-          <div className="font-[family-name:var(--font-alfa-slab)] text-2xl md:text-3xl text-[#2A2118]">
+          <div className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-2xl md:text-3xl text-[var(--dwd-ink)]">
             {data.heading}
           </div>
-          <Link href={data.cta_href} className="text-sm font-bold text-[#C1502E] hover:text-[#8F3A1F]">
+          <Link href={data.cta_href} className="text-sm font-bold text-[var(--dwd-accent-1)] hover:text-[var(--dwd-accent-1-hover)]">
             {data.cta_label}
           </Link>
         </div>
 
         {loading ? (
-          <div className="text-[#6B5B45]">Loading upcoming nights&hellip;</div>
+          <div className="text-[var(--dwd-ink-faint)]">Loading upcoming nights&hellip;</div>
         ) : events.length === 0 ? (
-          <div className="text-[#6B5B45]">{fillTokens(data.empty_state_text, tokens)}</div>
+          <div className="text-[var(--dwd-ink-faint)]">{fillTokens(data.empty_state_text, tokens)}</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {events.map((event, i) => (
               <Link
                 key={event.id}
                 href={`/events/event-detail/${event.id}`}
-                className={`group bg-white border-2 border-[#2A2118] rounded-[10px] p-6 transition-transform duration-150 hover:!rotate-0 hover:-translate-y-1 ${CARD_TILTS[i % CARD_TILTS.length]}`}
-                style={{ boxShadow: '6px 6px 0 rgba(42,33,24,0.10)' }}
+                className="group bg-[var(--dwd-bg-card)] p-6 transition-transform duration-150 hover:!rotate-0 hover:-translate-y-1 [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)]"
+                style={{ transform: `rotate(var(${CARD_TILT_VARS[i % CARD_TILT_VARS.length]}))` }}
               >
-                <div className="text-xs font-bold uppercase tracking-wider text-[#C1502E] mb-2.5">
+                <div className="text-xs font-bold uppercase tracking-wider text-[var(--dwd-accent-1)] mb-2.5">
                   {compactDate(event.date)}
                 </div>
                 <div
                   className="text-[17px] font-bold mb-1.5 leading-snug"
                   dangerouslySetInnerHTML={{ __html: formatEventText(getDisplayTitle(event)) }}
                 />
-                <div className="text-sm text-[#6B5B45]">{event.location || tokens.venue}</div>
+                <div className="text-sm text-[var(--dwd-ink-faint)]">{event.location || tokens.venue}</div>
               </Link>
             ))}
           </div>

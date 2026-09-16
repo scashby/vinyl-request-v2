@@ -21,6 +21,75 @@ import {
   type SectionType,
   type SocialLink,
 } from "src/lib/homeContent";
+import { DEFAULT_THEME, THEMES, isThemeName, type ThemeName } from "src/lib/theme";
+
+function ThemeSwitcher() {
+  const [active, setActive] = useState<ThemeName>(DEFAULT_THEME);
+  const [loading, setLoading] = useState(true);
+  const [applying, setApplying] = useState<ThemeName | null>(null);
+
+  useEffect(() => {
+    fetch("/api/site-theme")
+      .then((res) => res.json())
+      .then((data) => {
+        if (isThemeName(data?.theme)) setActive(data.theme);
+      })
+      .catch((err) => console.error("Error loading active theme:", err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const apply = async (name: ThemeName) => {
+    setApplying(name);
+    try {
+      const res = await fetch("/api/site-theme", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme: name }),
+      });
+      if (res.ok) setActive(name);
+    } catch (err) {
+      console.error("Error applying theme:", err);
+    } finally {
+      setApplying(null);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+      <h2 className="text-lg font-bold text-gray-900 mb-1">Site Theme</h2>
+      <p className="text-sm text-gray-600 mb-4">
+        Switch the whole site&rsquo;s look — colors, fonts, and card style — between the three saved directions. Takes
+        effect immediately, everywhere (nav, footer, homepage).
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {Object.values(THEMES).map((t) => {
+          const isActive = !loading && active === t.name;
+          return (
+            <button
+              key={t.name}
+              onClick={() => apply(t.name)}
+              disabled={applying !== null}
+              className={`text-left rounded-lg border-2 p-4 transition-colors disabled:opacity-60 ${
+                isActive ? "border-blue-600 bg-blue-50" : "border-gray-200 hover:border-gray-300 bg-white"
+              }`}
+            >
+              <div className="flex gap-1.5 mb-3">
+                {[t.bg, t.accent1, t.accent2, t.accent3, t.ink].map((c, i) => (
+                  <div key={i} className="w-6 h-6 rounded-full border border-black/10" style={{ background: c }} />
+                ))}
+              </div>
+              <div className="font-bold text-sm text-gray-900 mb-1">
+                {t.label} {isActive && <span className="text-blue-600 font-normal">(active)</span>}
+              </div>
+              <div className="text-xs text-gray-600 leading-relaxed">{t.blurb}</div>
+              {applying === t.name && <div className="text-xs text-blue-600 mt-2">Applying…</div>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 const inputClass =
   "w-full bg-white text-gray-900 border border-gray-300 px-3 py-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none";
@@ -187,6 +256,8 @@ export default function EditHomePage() {
         </a>
         .
       </p>
+
+      <ThemeSwitcher />
 
       {migrationMissing && (
         <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-lg p-4 mb-6 text-sm">

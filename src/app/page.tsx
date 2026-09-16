@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "src/lib/supabaseClient";
 import { resolveSections, type HomepageSection } from "src/lib/homeContent";
+import { DEFAULT_THEME, THEMES, isThemeName, toCssVars, type ThemeName } from "src/lib/theme";
 import { HeroSection } from "src/components/home/HeroSection";
 import { ResidencySection } from "src/components/home/ResidencySection";
 import { EventsStripSection } from "src/components/home/EventsStripSection";
@@ -53,12 +54,22 @@ export default function Page() {
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [themeName, setThemeName] = useState<ThemeName>(DEFAULT_THEME);
 
   useEffect(() => {
     fetch("/api/homepage-sections?page=home")
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setSections(Array.isArray(data) ? data : []))
       .catch((err) => console.error("Error loading homepage sections:", err));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/site-theme")
+      .then((res) => res.json())
+      .then((data) => {
+        if (isThemeName(data?.theme)) setThemeName(data.theme);
+      })
+      .catch((err) => console.error("Error loading active theme:", err));
   }, []);
 
   useEffect(() => {
@@ -154,9 +165,13 @@ export default function Page() {
   const s = resolveSections(sections);
   const tokens = { night: s.residency.data.night, venue: s.residency.data.venue };
   const isVisible = (row: HomepageSection<unknown> | null) => row?.visible ?? true;
+  const theme = THEMES[themeName];
 
   return (
-    <div className="min-h-screen font-[family-name:var(--font-work-sans)] bg-[#FAF1E1] text-[#2A2118]">
+    <div
+      className="min-h-screen font-[family-name:var(--dwd-font-body)] bg-[var(--dwd-bg)] text-[var(--dwd-ink)]"
+      style={toCssVars(theme) as React.CSSProperties}
+    >
       {isVisible(s.hero.row) && <HeroSection data={s.hero.data} tokens={tokens} />}
       {isVisible(s.residency.row) && <ResidencySection data={s.residency.data} />}
       {isVisible(s.events_strip.row) && (

@@ -5,15 +5,26 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
+import { DEFAULT_THEME, THEMES, isThemeName, toCssVars, type ThemeName } from 'src/lib/theme';
 
 export default function NavigationMenu() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [themeName, setThemeName] = useState<ThemeName>(DEFAULT_THEME);
   const pathname = usePathname();
 
   // Mobile menu should never persist open across a route change.
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    fetch('/api/site-theme')
+      .then((res) => res.json())
+      .then((data) => {
+        if (isThemeName(data?.theme)) setThemeName(data.theme);
+      })
+      .catch((err) => console.error('Error loading active theme:', err));
+  }, []);
 
   // HIDE MENU: Check condition AFTER all hooks are called
   if (pathname?.startsWith('/admin') || pathname?.startsWith('/edit-collection')) {
@@ -30,9 +41,12 @@ export default function NavigationMenu() {
     { name: 'Merch', path: '/merch' },
   ];
 
+  const theme = THEMES[themeName];
+  const cssVars = toCssVars(theme) as React.CSSProperties;
+
   return (
-    <>
-      <nav className="sticky top-0 left-0 right-0 z-50 bg-[#FAF1E1]/95 backdrop-blur-sm border-b border-[#2A2118]/10">
+    <div style={cssVars}>
+      <nav className="sticky top-0 left-0 right-0 z-50 bg-[var(--dwd-nav-bg)]/95 backdrop-blur-sm border-b border-[var(--dwd-ink)]/10">
         <div className="w-full px-6 md:px-10 py-3 flex items-center justify-between">
 
           <Link href="/" className="flex items-center gap-3 group">
@@ -62,12 +76,12 @@ export default function NavigationMenu() {
                   key={item.path}
                   href={item.path}
                   className={`relative text-sm font-bold uppercase tracking-wider transition-colors duration-200 ${
-                    isActive ? 'text-[#2F7A78]' : 'text-[#2A2118]/70 hover:text-[#2A2118]'
+                    isActive ? 'text-[var(--dwd-accent-2)]' : 'text-[var(--dwd-ink)]/70 hover:text-[var(--dwd-ink)]'
                   }`}
                 >
                   {item.name}
                   {isActive && (
-                    <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-[#2F7A78]" />
+                    <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-[var(--dwd-accent-2)]" />
                   )}
                 </Link>
               );
@@ -76,7 +90,7 @@ export default function NavigationMenu() {
 
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 text-[#2A2118] hover:text-[#2F7A78] transition-colors z-50 relative"
+            className="md:hidden p-2 text-[var(--dwd-ink)] hover:text-[var(--dwd-accent-2)] transition-colors z-50 relative"
             aria-label="Toggle menu"
           >
             <div className="space-y-1.5 w-6">
@@ -89,14 +103,14 @@ export default function NavigationMenu() {
       </nav>
 
       <div
-        className={`fixed inset-0 z-40 bg-[#FAF1E1] transition-all duration-300 md:hidden flex flex-col items-center justify-center gap-8 ${
+        className={`fixed inset-0 z-40 bg-[var(--dwd-nav-bg)] transition-all duration-300 md:hidden flex flex-col items-center justify-center gap-8 ${
           isMobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'
         }`}
       >
         <Link
             href="/"
             onClick={() => setIsMobileMenuOpen(false)}
-            className="text-3xl font-serif-display font-bold text-[#2A2118] mb-4"
+            className="text-3xl font-serif-display font-bold text-[var(--dwd-ink)] mb-4"
         >
             Home
         </Link>
@@ -106,14 +120,14 @@ export default function NavigationMenu() {
             href={item.path}
             onClick={() => setIsMobileMenuOpen(false)}
             className={`text-2xl font-bold uppercase tracking-widest ${
-              pathname === item.path ? 'text-[#2F7A78]' : 'text-[#2A2118]/70 hover:text-[#2A2118]'
+              pathname === item.path ? 'text-[var(--dwd-accent-2)]' : 'text-[var(--dwd-ink)]/70 hover:text-[var(--dwd-ink)]'
             }`}
           >
             {item.name}
           </Link>
         ))}
       </div>
-    </>
+    </div>
   );
 }
-// AUDIT: inspected for staff-picks, no changes needed.
+// AUDIT: theme-aware via src/lib/theme.ts (was hardcoded to the Sunday Matinee hybrid palette).

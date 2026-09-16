@@ -11,7 +11,7 @@ interface BlogPost {
   'content:encoded'?: string;
 }
 
-const CARD_TILTS = ['-rotate-[1.2deg]', 'rotate-1', '-rotate-[0.6deg]', 'rotate-[1.4deg]'];
+const CARD_TILT_VARS = ['--dwd-tilt-1', '--dwd-tilt-2', '--dwd-tilt-3', '--dwd-tilt-4'];
 
 const extractFirstImg = (post: BlogPost): string | null => {
   const html = post['content:encoded'] || post.content || '';
@@ -32,10 +32,10 @@ export function DialoguesTeaserSection({
     <Container size="xl">
       <div className="mb-16 md:mb-20">
         <div className="flex items-baseline justify-between mb-7">
-          <div className="font-[family-name:var(--font-alfa-slab)] text-2xl md:text-3xl text-[#2A2118]">
+          <div className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-2xl md:text-3xl text-[var(--dwd-ink)]">
             {data.heading}
           </div>
-          <Link href={data.cta_href} className="text-sm font-bold text-[#C1502E] hover:text-[#8F3A1F]">
+          <Link href={data.cta_href} className="text-sm font-bold text-[var(--dwd-accent-1)] hover:text-[var(--dwd-accent-1-hover)]">
             {data.cta_label}
           </Link>
         </div>
@@ -46,16 +46,16 @@ export function DialoguesTeaserSection({
               href={post.link}
               target="_blank"
               rel="noopener noreferrer"
-              className={`group block bg-white border-2 border-[#2A2118] rounded-xl overflow-hidden transition-transform duration-150 hover:!rotate-0 hover:-translate-y-1 ${CARD_TILTS[i % CARD_TILTS.length]}`}
-              style={{ boxShadow: '6px 6px 0 rgba(42,33,24,0.08)' }}
+              className="group block bg-[var(--dwd-bg-card)] overflow-hidden transition-transform duration-150 hover:!rotate-0 hover:-translate-y-1 [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)]"
+              style={{ transform: `rotate(var(${CARD_TILT_VARS[i % CARD_TILT_VARS.length]}))` }}
             >
               <div
-                className="h-[150px] bg-[#D8C9AE] bg-cover bg-center"
-                style={extractFirstImg(post) ? { backgroundImage: `url(${extractFirstImg(post)})` } : undefined}
+                className="h-[150px] bg-[var(--dwd-accent-3)] opacity-60 bg-cover bg-center"
+                style={extractFirstImg(post) ? { backgroundImage: `url(${extractFirstImg(post)})`, opacity: 1 } : undefined}
               />
               <div className="p-5">
-                <div className="text-base font-bold mb-2 leading-snug line-clamp-2">{post.title}</div>
-                <div className="text-sm text-[#6B5B45] leading-relaxed line-clamp-3">
+                <div className="text-base font-bold mb-2 leading-snug line-clamp-2 text-[var(--dwd-ink)]">{post.title}</div>
+                <div className="text-sm text-[var(--dwd-ink-faint)] leading-relaxed line-clamp-3">
                   {post.contentSnippet || ''}
                 </div>
               </div>
