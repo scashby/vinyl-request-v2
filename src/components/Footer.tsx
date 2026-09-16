@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getSocialIcon } from "src/lib/socialIcons";
 import { DEFAULT_SECTIONS, type ConnectData, type HomepageSection } from "src/lib/homeContent";
-import { DEFAULT_THEME, THEMES, isThemeName, toCssVars, type ThemeName } from "src/lib/theme";
+import { useActiveTheme } from "src/lib/useActiveTheme";
 
 // Email is a fixed footer utility link, not part of the editable "socials"
 // list (which is shared with the homepage Connect section via
@@ -14,7 +14,7 @@ const EMAIL_LINK = { name: "Email", url: "mailto:steve@deadwaxdialogues.com" };
 export default function Footer() {
   const pathname = usePathname();
   const [connectData, setConnectData] = useState<ConnectData>(DEFAULT_SECTIONS.connect);
-  const [themeName, setThemeName] = useState<ThemeName>(DEFAULT_THEME);
+  const { cssVars } = useActiveTheme();
 
   useEffect(() => {
     fetch("/api/homepage-sections?page=home")
@@ -26,26 +26,16 @@ export default function Footer() {
       .catch((err) => console.error("Error loading footer social links:", err));
   }, []);
 
-  useEffect(() => {
-    fetch("/api/site-theme")
-      .then((res) => res.json())
-      .then((data) => {
-        if (isThemeName(data?.theme)) setThemeName(data.theme);
-      })
-      .catch((err) => console.error("Error loading active theme:", err));
-  }, []);
-
   if (pathname?.startsWith("/admin") || pathname?.startsWith("/edit-collection")) {
     return null;
   }
 
   const links = [...connectData.socials, EMAIL_LINK];
-  const theme = THEMES[themeName];
 
   return (
     <footer
       className="bg-[var(--dwd-nav-bg)] text-[var(--dwd-ink)] w-full border-t border-[var(--dwd-ink)]/10"
-      style={toCssVars(theme) as React.CSSProperties}
+      style={cssVars}
     >
       <div className="container-responsive py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <span className="text-sm tracking-wide text-[var(--dwd-ink)]/70 order-2 sm:order-1">

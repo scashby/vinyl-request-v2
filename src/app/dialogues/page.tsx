@@ -3,6 +3,8 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { Container } from "components/ui/Container";
+import { useActiveTheme } from "src/lib/useActiveTheme";
 
 interface BlogPost {
   title: string;
@@ -23,6 +25,8 @@ interface Playlist {
   visible: boolean;
 }
 
+const CARD_TILT_VARS = ["--dwd-tilt-1", "--dwd-tilt-2", "--dwd-tilt-3", "--dwd-tilt-4"];
+
 function extractFirstImg(post: BlogPost): string | null {
   const html = post["content:encoded"] || post.content || "";
   const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
@@ -32,20 +36,11 @@ function extractFirstImg(post: BlogPost): string | null {
 
 function Tags({ categories }: { categories?: string[] }) {
   if (!categories || !categories.length) return null;
-  
-  const getColorClass = (cat: string) => {
-    const c = cat.toLowerCase();
-    if (c === 'featured') return 'text-purple-600';
-    if (c === 'playlist') return 'text-red-600';
-    if (c === 'blog') return 'text-green-600';
-    if (c === 'news') return 'text-orange-600';
-    return 'text-gray-600';
-  };
 
   return (
     <div className="flex flex-wrap gap-3 mb-2">
       {categories.map((cat, i) => (
-        <span key={i} className={`font-bold text-xs uppercase tracking-wider ${getColorClass(cat)}`}>
+        <span key={i} className="font-bold text-xs uppercase tracking-wider text-[var(--dwd-accent-1)]">
           {cat.toUpperCase()}
         </span>
       ))}
@@ -57,13 +52,14 @@ export default function DialoguesPage() {
   const [featured, setFeatured] = useState<BlogPost | null>(null);
   const [articles, setArticles] = useState<BlogPost[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const { cssVars } = useActiveTheme();
 
   useEffect(() => {
     fetch("/api/playlists")
       .then(res => res.json())
       .then((data: Playlist[]) => setPlaylists(data ?? []));
   }, []);
-  
+
   useEffect(() => {
     fetch("/api/wordpress")
       .then(res => res.json())
@@ -87,23 +83,30 @@ export default function DialoguesPage() {
   }, []);
 
   return (
-    <div className="bg-white min-h-screen">
-      <header className="relative w-full h-[300px] flex items-center justify-center bg-[url('/images/event-header-still.jpg')] bg-cover bg-center">
-        <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-8">
-          <h1 className="font-serif-display text-4xl md:text-5xl font-bold text-white text-center m-0">Dialogues</h1>
+    <div
+      className="min-h-screen font-[family-name:var(--dwd-font-body)] bg-[var(--dwd-bg)] text-[var(--dwd-ink)]"
+      style={cssVars}
+    >
+      <Container size="xl">
+        <div className="pt-16 pb-10 md:pt-20">
+          <div className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-4xl md:text-5xl mb-3">
+            Dialogues
+          </div>
+          <p className="text-lg text-[var(--dwd-ink-soft)] max-w-xl">
+            Crate digs, liner notes, and whatever else is on the turntable.
+          </p>
         </div>
-      </header>
-      
-      <main className="container-responsive py-12">
-        <div className="flex flex-col lg:flex-row gap-10 items-start">
-          
+
+        <div className="flex flex-col lg:flex-row gap-10 items-start pb-20">
+
           {/* Main Content */}
           <div className="flex-1 min-w-0 w-full">
             {featured && (
-              <div className="bg-white border border-gray-100 rounded-2xl shadow-lg overflow-hidden mb-10 flex flex-col md:flex-row">
+              <div
+                className="overflow-hidden mb-10 flex flex-col md:flex-row bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)]"
+              >
                 <div className="md:w-1/2 relative h-64 md:h-auto">
                   <Image
-                    // FIX: Updated placeholder image path
                     src={extractFirstImg(featured) || "/images/coverplaceholder.png"}
                     alt={featured.title}
                     fill
@@ -114,38 +117,42 @@ export default function DialoguesPage() {
                 </div>
                 <div className="p-8 md:w-1/2 flex flex-col justify-center">
                   <div className="mb-2">
-                    <span className="font-bold text-xs uppercase tracking-wider text-purple-600">FEATURED</span>
+                    <span className="font-bold text-xs uppercase tracking-wider text-[var(--dwd-accent-1)]">FEATURED</span>
                   </div>
-                  <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 leading-tight">
-                    <a href={featured.link} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">
+                  <h2 className="text-2xl md:text-3xl font-bold mb-3 leading-tight">
+                    <a href={featured.link} target="_blank" rel="noopener noreferrer" className="hover:opacity-70 transition-opacity">
                       {featured.title}
                     </a>
                   </h2>
-                  <div className="text-sm text-gray-500 mb-4">
+                  <div className="text-sm text-[var(--dwd-ink-faint)] mb-4">
                     {featured.pubDate
                       ? new Date(featured.pubDate).toLocaleDateString(undefined, {
                           year: "numeric", month: "long", day: "numeric"
                         })
                       : ""}
                   </div>
-                  <p className="text-gray-600 leading-relaxed mb-6 line-clamp-3">
+                  <p className="text-[var(--dwd-ink-soft)] leading-relaxed mb-6 line-clamp-3">
                     {featured.contentSnippet || ""}
                   </p>
                   <a
                     href={featured.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 font-semibold hover:underline"
+                    className="text-[var(--dwd-accent-1)] font-semibold hover:text-[var(--dwd-accent-1-hover)]"
                   >
-                    Read more →
+                    Read more &rarr;
                   </a>
                 </div>
               </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {articles.map((post) => (
-                <div className="bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col" key={post.guid || post.link}>
+              {articles.map((post, i) => (
+                <div
+                  className="overflow-hidden flex flex-col transition-transform duration-150 hover:!rotate-0 hover:-translate-y-1 bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)]"
+                  style={{ transform: `rotate(var(${CARD_TILT_VARS[i % CARD_TILT_VARS.length]}))` }}
+                  key={post.guid || post.link}
+                >
                   <a
                     href={post.link}
                     target="_blank"
@@ -154,7 +161,6 @@ export default function DialoguesPage() {
                   >
                     <div className="relative h-48 w-full">
                       <Image
-                        // FIX: Updated placeholder image path
                         src={extractFirstImg(post) || "/images/coverplaceholder.png"}
                         alt={post.title}
                         fill
@@ -164,19 +170,19 @@ export default function DialoguesPage() {
                     </div>
                     <div className="p-5 flex flex-col flex-1">
                       <Tags categories={post.categories} />
-                      <h3 className="text-lg font-bold text-gray-900 mb-2 leading-snug line-clamp-2">
+                      <h3 className="text-lg font-bold mb-2 leading-snug line-clamp-2">
                         {post.title}
                       </h3>
-                      <div className="text-xs text-gray-500 mb-3">
+                      <div className="text-xs text-[var(--dwd-ink-faint)] mb-3">
                         {post.pubDate ? new Date(post.pubDate).toLocaleDateString(undefined, {
                           year: "numeric", month: "long", day: "numeric"
                         }) : ""}
                       </div>
-                      <p className="text-sm text-gray-600 line-clamp-3 mb-4 flex-1">
+                      <p className="text-sm text-[var(--dwd-ink-soft)] line-clamp-3 mb-4 flex-1">
                         {post.contentSnippet || ""}
                       </p>
-                      <span className="text-blue-600 text-sm font-semibold mt-auto">
-                        Read more →
+                      <span className="text-[var(--dwd-accent-1)] text-sm font-semibold mt-auto">
+                        Read more &rarr;
                       </span>
                     </div>
                   </a>
@@ -190,34 +196,35 @@ export default function DialoguesPage() {
                   href="https://blog.deadwaxdialogues.com/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 font-semibold hover:underline text-lg"
+                  className="text-[var(--dwd-accent-1)] font-semibold hover:text-[var(--dwd-accent-1-hover)] text-lg"
                 >
-                  View more on Substack →
+                  View more on Substack &rarr;
                 </a>
               </div>
             )}
           </div>
 
           {/* Sidebar */}
-          <aside className="w-full lg:w-[320px] flex-shrink-0 space-y-8 bg-purple-50/50 p-6 rounded-2xl border border-purple-100">
+          <aside
+            className="w-full lg:w-[320px] flex-shrink-0 space-y-8 p-6 bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]"
+          >
             <div>
-              <h3 className="text-lg font-bold text-purple-800 mb-4 border-b border-purple-200 pb-2">
+              <div className="text-lg font-bold mb-4 border-b border-[var(--dwd-ink)]/10 pb-2">
                 Playlists
-              </h3>
+              </div>
               <div className="space-y-6">
                 {playlists.map((p) => (
                   <div key={p.id || p.platform}>
-                    <div className="text-sm font-bold text-purple-900 mb-2 uppercase tracking-wide">
+                    <div className="text-sm font-bold text-[var(--dwd-accent-2)] mb-2 uppercase tracking-wide">
                       {p.platform}
                     </div>
-                    <div 
-                      className="rounded-lg overflow-hidden shadow-sm bg-white" 
-                      dangerouslySetInnerHTML={{ 
-                        // Fix: Clean HTML to remove Allow attribute errors
+                    <div
+                      className="rounded-lg overflow-hidden shadow-sm"
+                      dangerouslySetInnerHTML={{
                         __html: (p.embed_html || p.embed_url || '')
                           .replace(/allowfullscreen="?"/g, '')
-                          .replace(/allowfullscreen/g, '') 
-                      }} 
+                          .replace(/allowfullscreen/g, '')
+                      }}
                     />
                   </div>
                 ))}
@@ -226,8 +233,8 @@ export default function DialoguesPage() {
           </aside>
 
         </div>
-      </main>
+      </Container>
     </div>
   );
 }
-// AUDIT: inspected, no changes.
+// AUDIT: restyled for v2 brand (theme-aware, shared card language); data source unchanged.

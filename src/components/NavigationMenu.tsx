@@ -1,48 +1,37 @@
 // src/components/NavigationMenu.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { DEFAULT_THEME, THEMES, isThemeName, toCssVars, type ThemeName } from 'src/lib/theme';
+import { useActiveTheme } from 'src/lib/useActiveTheme';
 
 export default function NavigationMenu() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [themeName, setThemeName] = useState<ThemeName>(DEFAULT_THEME);
   const pathname = usePathname();
+  const { cssVars } = useActiveTheme();
 
   // Mobile menu should never persist open across a route change.
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
-  useEffect(() => {
-    fetch('/api/site-theme')
-      .then((res) => res.json())
-      .then((data) => {
-        if (isThemeName(data?.theme)) setThemeName(data.theme);
-      })
-      .catch((err) => console.error('Error loading active theme:', err));
-  }, []);
-
   // HIDE MENU: Check condition AFTER all hooks are called
   if (pathname?.startsWith('/admin') || pathname?.startsWith('/edit-collection')) {
     return null;
   }
 
+  // "Browse Collection" and the personal-collector nav items were dropped —
+  // that's About-page (wishlist/Most Wanted) content now, not primary nav.
   const navLinks = [
     { name: 'About', path: '/about' },
     { name: 'Events', path: '/events/events-page' },
     { name: 'Games', path: '/games' },
-    { name: 'Browse Collection', path: '/browse/browse-albums' },
     { name: 'DJ Sets', path: '/dj-sets' },
     { name: 'Dialogues', path: '/dialogues' },
     { name: 'Merch', path: '/merch' },
   ];
-
-  const theme = THEMES[themeName];
-  const cssVars = toCssVars(theme) as React.CSSProperties;
 
   return (
     <div style={cssVars}>

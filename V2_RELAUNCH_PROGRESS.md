@@ -79,13 +79,34 @@ merging to `main`.
   the exact deployed commit: compiled CSS output, DOM measurements via a
   scripted authenticated session, and a screenshot — not by asking for
   manual re-verification.
+- **Nav trimmed and About/Dialogues/Merch restyled + extended into the
+  content model.** "Browse Collection" removed from nav — Most Wanted and
+  the Amazon/Discogs wishlist links already lived on About (not a new
+  move). All three pages now theme-aware (`useActiveTheme` — extracted
+  from the triplicated fetch logic in page.tsx/Nav/Footer into
+  `src/lib/useActiveTheme.ts`) and use the shared card language.
+  - **About**: visual-only restyle. Data source untouched — still
+    `/api/about-content` + `/admin/edit-about`, no migration needed. Also
+    fixed a real bug found while verifying: two blank Most Wanted rows
+    (empty title/url already sitting in that table) were rendering as
+    empty numbered list items — now filtered out client-side.
+  - **Dialogues**: visual-only restyle (rotated "pinned flyer" post
+    cards, matching the homepage's Dialogues teaser). Data sources
+    unchanged (Substack via `/api/wordpress`, Playlists).
+  - **Merch**: store list moved off a hardcoded array into the *same*
+    `homepage_sections` table, scoped `page='merch'` instead of `'home'`
+    — exactly the reuse that table was designed for, no new table or API
+    route needed. Migration `sql/create-merch-sections.sql` applied.
+    Editable at new **`/admin/edit-merch`**.
+  - **Known pre-existing issue, not fixed (out of scope):** the About
+    page's Facebook embed (via `SocialEmbeds.tsx`, untouched by this
+    work) throws a Facebook SDK error and renders as a blank box in a
+    local/non-production-domain test — likely Meta's embed SDK
+    restricting to whitelisted domains. Unclear yet whether this also
+    happens on the real `deadwaxdialogues.com` domain; worth checking
+    there specifically.
 
 **📋 PLANNED / BACKLOG:**
-- Extend the section/content model + admin editing to About → Book,
-  Dialogues, and Merch → Connect.
-- Trim the nav/sitemap (currently unchanged this pass): fold or demote
-  Browse Collection, Most Wanted, Amazon/Discogs wishlists — these are
-  personal-collector content, not the DJ/events brand.
 - Add a real photo of Steve (hero + Game Deck teaser currently show an
   honest "photo coming soon" placeholder — no fabricated image).
 - Longer-term, explicitly deferred: a true drag-and-drop page builder

@@ -274,7 +274,17 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
               >
                 📄 About Page
               </Link>
-              <Link 
+              <Link
+                href="/admin/edit-merch"
+                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                  pathname === "/admin/edit-merch"
+                    ? "bg-green-700 text-white"
+                    : "bg-green-600 text-white hover:bg-green-700"
+                }`}
+              >
+                🛍️ Merch Page
+              </Link>
+              <Link
                 href="/admin/playlists"
                 className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
                   pathname === "/admin/playlists" 
