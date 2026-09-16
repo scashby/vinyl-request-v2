@@ -412,7 +412,7 @@ export default function EditHomePage() {
             {connect.data.socials.map((social: SocialLink, i: number) => (
               <div key={i} className="flex gap-2">
                 <input
-                  className={`${inputClass} w-32 flex-shrink-0`}
+                  className={`${inputClass} !w-32 flex-shrink-0`}
                   placeholder="Name"
                   value={social.name}
                   onChange={(e) => {
