@@ -1,67 +1,34 @@
 "use client";
 
-import {
-  SiDiscogs,
-  SiFacebook,
-  SiInstagram,
-  SiThreads,
-  SiBluesky,
-  SiSubstack,
-  SiSpotify,
-} from "react-icons/si";
-import { FiMail } from "react-icons/fi";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { getSocialIcon } from "src/lib/socialIcons";
+import { DEFAULT_SECTIONS, type ConnectData, type HomepageSection } from "src/lib/homeContent";
 
-// Shared with the homepage's Connect section — keep this the single source
-// of truth for where our social links point.
-export const socials = [
-  {
-    name: "Spotify",
-    url: "https://open.spotify.com/user/deadwaxdialogues",
-    Icon: SiSpotify,
-  },
-  {
-    name: "Instagram",
-    url: "https://www.instagram.com/deadwaxdialogues/",
-    Icon: SiInstagram,
-  },
-  {
-    name: "Facebook",
-    url: "https://www.facebook.com/profile.php?id=61576451743378",
-    Icon: SiFacebook,
-  },
-  {
-    name: "Threads",
-    url: "https://www.threads.net/@deadwaxdialogues",
-    Icon: SiThreads,
-  },
-  {
-    name: "Bluesky",
-    url: "https://bsky.app/profile/deadwaxdialogues.bsky.social",
-    Icon: SiBluesky,
-  },
-  {
-    name: "Substack",
-    url: "https://deadwaxdialogues.substack.com",
-    Icon: SiSubstack,
-  },
-  {
-    name: "Discogs",
-    url: "https://www.discogs.com/user/socialblunders/collection",
-    Icon: SiDiscogs,
-  },
-  {
-    name: "Email",
-    url: "mailto:steve@deadwaxdialogues.com",
-    Icon: FiMail,
-  },
-];
+// Email is a fixed footer utility link, not part of the editable "socials"
+// list (which is shared with the homepage Connect section via
+// /admin/edit-home) — it's always appended last.
+const EMAIL_LINK = { name: "Email", url: "mailto:steve@deadwaxdialogues.com" };
 
 export default function Footer() {
   const pathname = usePathname();
+  const [connectData, setConnectData] = useState<ConnectData>(DEFAULT_SECTIONS.connect);
+
+  useEffect(() => {
+    fetch("/api/homepage-sections?page=home")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((rows: HomepageSection<Partial<ConnectData>>[]) => {
+        const connectRow = rows.find((r) => r.section_type === "connect");
+        if (connectRow) setConnectData({ ...DEFAULT_SECTIONS.connect, ...connectRow.data });
+      })
+      .catch((err) => console.error("Error loading footer social links:", err));
+  }, []);
+
   if (pathname?.startsWith("/admin") || pathname?.startsWith("/edit-collection")) {
     return null;
   }
+
+  const links = [...connectData.socials, EMAIL_LINK];
 
   return (
     <footer className="bg-[#FAF1E1] text-[#2A2118] w-full border-t border-[#2A2118]/10">
@@ -70,21 +37,24 @@ export default function Footer() {
           &copy; {new Date().getFullYear()} Dead Wax Dialogues
         </span>
         <div className="flex gap-2.5 order-1 sm:order-2">
-          {socials.map(({ name, url, Icon }) => (
-            <a
-              key={name}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={name}
-              className="w-9 h-9 rounded-full bg-[#2A2118]/5 flex items-center justify-center text-[#2A2118]/70 transition-colors duration-200 hover:bg-[#2A2118] hover:text-[#FAF1E1]"
-            >
-              <Icon size={16} />
-            </a>
-          ))}
+          {links.map(({ name, url }) => {
+            const Icon = getSocialIcon(name);
+            return (
+              <a
+                key={name}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={name}
+                className="w-9 h-9 rounded-full bg-[#2A2118]/5 flex items-center justify-center text-[#2A2118]/70 transition-colors duration-200 hover:bg-[#2A2118] hover:text-[#FAF1E1]"
+              >
+                <Icon size={16} />
+              </a>
+            );
+          })}
         </div>
       </div>
     </footer>
   );
 }
-// AUDIT: restyled for v2 brand palette; now renders site-wide (was previously orphaned) and self-hides on admin/edit-collection routes.
+// AUDIT: restyled for v2 brand palette; now renders site-wide (was previously orphaned), self-hides on admin/edit-collection routes, and pulls social links from the shared homepage content model (src/lib/homeContent.ts) instead of a hardcoded list.

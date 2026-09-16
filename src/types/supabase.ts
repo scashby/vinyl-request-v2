@@ -4039,6 +4039,39 @@ export type Database = {
           },
         ]
       }
+      homepage_sections: {
+        Row: {
+          created_at: string
+          data: Json
+          id: number
+          page: string
+          position: number
+          section_type: string
+          updated_at: string
+          visible: boolean
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: never
+          page?: string
+          position?: number
+          section_type: string
+          updated_at?: string
+          visible?: boolean
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: never
+          page?: string
+          position?: number
+          section_type?: string
+          updated_at?: string
+          visible?: boolean
+        }
+        Relationships: []
+      }
       image_assets: {
         Row: {
           archived: boolean

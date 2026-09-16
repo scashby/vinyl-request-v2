@@ -254,11 +254,21 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <h4 className="text-sm font-semibold text-green-800 mb-2">📝 Content</h4>
             <div className="space-y-2">
-              <Link 
+              <Link
+                href="/admin/edit-home"
+                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                  pathname === "/admin/edit-home"
+                    ? "bg-green-700 text-white"
+                    : "bg-green-600 text-white hover:bg-green-700"
+                }`}
+              >
+                🏠 Home Page
+              </Link>
+              <Link
                 href="/admin/edit-about"
                 className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/admin/edit-about" 
-                    ? "bg-green-700 text-white" 
+                  pathname === "/admin/edit-about"
+                    ? "bg-green-700 text-white"
                     : "bg-green-600 text-white hover:bg-green-700"
                 }`}
               >
