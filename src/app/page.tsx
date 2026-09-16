@@ -5,10 +5,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSession } from "src/components/AuthProvider";
+import { SiSpotify } from "react-icons/si";
 import { supabase } from "src/lib/supabaseClient";
 import { formatEventText } from "src/utils/textFormatter";
 import { Container } from "components/ui/Container";
+import { socials } from "src/components/Footer";
 
 interface Event {
   id: number;
@@ -17,30 +18,34 @@ interface Event {
   created_at?: string;
   location?: string;
   image_url?: string;
-  is_featured_grid?: boolean;
-  featured_priority?: number | string | null;
   allowed_tags?: string[] | string | null;
 }
 
-interface EventTheme {
-  accent: string;
-  accentSoft: string;
-  border: string;
-  glow: string;
-  cardBg: string;
-  badgeText: string;
+interface BlogPost {
+  title: string;
+  link: string;
+  guid?: string;
+  pubDate?: string;
+  contentSnippet?: string;
+  content?: string;
+  "content:encoded"?: string;
 }
 
-const DEFAULT_THEME: EventTheme = {
-  accent: "rgb(0, 196, 255)",
-  accentSoft: "rgba(0, 196, 255, 0.25)",
-  border: "rgba(0, 196, 255, 0.45)",
-  glow: "rgba(0, 196, 255, 0.35)",
-  cardBg: "linear-gradient(135deg, rgba(0,196,255,0.18), rgba(6,6,10,0.95))",
-  badgeText: "#051014",
-};
+interface Playlist {
+  id: number;
+  platform: string;
+  embed_html?: string;
+  embed_url?: string;
+  visible: boolean;
+}
 
 const EVENT_TYPE_TAG_PREFIX = "event_type:";
+const RESIDENCY_VENUE = "Devil's Purse Brewery";
+const RESIDENCY_NIGHT = "Sunday";
+const RESIDENCY_MAP_URL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(RESIDENCY_VENUE)}`;
+
+// Rotation/shadow "pinned flyer" treatment, cycled across each grid of cards.
+const CARD_TILTS = ["-rotate-[1.2deg]", "rotate-1", "-rotate-[0.6deg]", "rotate-[1.4deg]"];
 
 const normalizeStringArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value;
@@ -66,84 +71,28 @@ const getDisplayTitle = (event: Event): string => {
   return event.title;
 };
 
-const getLuminance = (r: number, g: number, b: number) => {
-  const srgb = [r, g, b].map((value) => {
-    const channel = value / 255;
-    return channel <= 0.03928
-      ? channel / 12.92
-      : Math.pow((channel + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+const compactDate = (dateString?: string) => {
+  if (!dateString || dateString === "" || dateString === "9999-12-31") {
+    return "TBA";
+  }
+  const d = new Date(`${dateString}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return "TBA";
+  return d
+    .toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    .toUpperCase();
 };
 
-const buildTheme = (r: number, g: number, b: number): EventTheme => {
-  const accent = `rgb(${r}, ${g}, ${b})`;
-  const accentSoft = `rgba(${r}, ${g}, ${b}, 0.25)`;
-  const border = `rgba(${r}, ${g}, ${b}, 0.45)`;
-  const glow = `rgba(${r}, ${g}, ${b}, 0.35)`;
-  const cardBg = `linear-gradient(135deg, rgba(${r}, ${g}, ${b}, 0.22), rgba(6,6,10,0.95))`;
-  const badgeText = getLuminance(r, g, b) > 0.6 ? "#0b0b0f" : "#f8fafc";
-  return { accent, accentSoft, border, glow, cardBg, badgeText };
+const extractFirstImg = (post: BlogPost): string | null => {
+  const html = post["content:encoded"] || post.content || "";
+  const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
+  return match ? match[1] : null;
 };
-
-const sampleImageColor = (url: string): Promise<EventTheme | null> =>
-  new Promise((resolve) => {
-    if (typeof window === "undefined") {
-      resolve(null);
-      return;
-    }
-
-    const img = new window.Image();
-    img.crossOrigin = "anonymous";
-    img.src = url;
-
-    img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        const size = 24;
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          resolve(null);
-          return;
-        }
-        ctx.drawImage(img, 0, 0, size, size);
-        const { data } = ctx.getImageData(0, 0, size, size);
-        let r = 0;
-        let g = 0;
-        let b = 0;
-        let count = 0;
-        for (let i = 0; i < data.length; i += 4) {
-          const alpha = data[i + 3];
-          if (alpha < 64) continue;
-          r += data[i];
-          g += data[i + 1];
-          b += data[i + 2];
-          count += 1;
-        }
-        if (count === 0) {
-          resolve(null);
-          return;
-        }
-        resolve(buildTheme(Math.round(r / count), Math.round(g / count), Math.round(b / count)));
-      } catch (error) {
-        console.warn("Unable to sample event image color.", error);
-        resolve(null);
-      }
-    };
-
-    img.onerror = () => resolve(null);
-  });
 
 export default function Page() {
-  const { session } = useSession();
   const [events, setEvents] = useState<Event[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
-  const [eventThemes, setEventThemes] = useState<Record<number, EventTheme>>({});
-
-  // Consistent button style: Muted zinc with subtle hover and backdrop blur
-  const buttonClass = "px-6 py-3 bg-zinc-900/80 text-zinc-100 rounded-full font-medium hover:bg-zinc-800 hover:text-white transition-all duration-300 backdrop-blur-sm border border-white/5 hover:border-white/20 shadow-lg";
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -188,6 +137,28 @@ export default function Page() {
     loadEvents();
   }, []);
 
+  useEffect(() => {
+    fetch("/api/wordpress")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.items || !Array.isArray(data.items)) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const items: BlogPost[] = data.items.map((p: any) => ({
+          ...p,
+          link: p.guid || p.link,
+        }));
+        setPosts(items.slice(0, 3));
+      })
+      .catch((err) => console.error("Error loading Dialogues posts:", err));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/playlists")
+      .then((res) => res.json())
+      .then((data: Playlist[]) => setPlaylists(data ?? []))
+      .catch((err) => console.error("Error loading playlists:", err));
+  }, []);
+
   const upcomingEvents = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const filtered = events.filter((event) => {
@@ -205,263 +176,284 @@ export default function Page() {
       return (a.date || "").localeCompare(b.date || "");
     });
 
-    return sorted.slice(0, 10);
+    return sorted.slice(0, 4);
   }, [events]);
 
-  const featuredEvents = useMemo(() => {
-    const byFeatured = (arr: Event[]) =>
-      [...arr].sort((a, b) => {
-        const ap =
-          typeof a.featured_priority === "number"
-            ? a.featured_priority
-            : parseInt(String(a.featured_priority), 10) || 9999;
-        const bp =
-          typeof b.featured_priority === "number"
-            ? b.featured_priority
-            : parseInt(String(b.featured_priority), 10) || 9999;
-        if (ap !== bp) return ap - bp;
-        const ad = a.date || "9999-12-31";
-        const bd = b.date || "9999-12-31";
-        return ad.localeCompare(bd);
-      });
-
-    return byFeatured(events.filter((event) => event.is_featured_grid)).slice(
-      0,
-      8
-    );
-  }, [events]);
-
-  const justAddedEvents = useMemo(() => {
-    const sorted = [...events].sort((a, b) => {
-      const at = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return bt - at;
-    });
-    return sorted.slice(0, 6);
-  }, [events]);
-
-  useEffect(() => {
-    let isActive = true;
-    const hydrateThemes = async () => {
-      const targets = [...upcomingEvents, ...justAddedEvents, ...featuredEvents];
-      const entries = await Promise.all(
-        targets.map(async (event) => {
-          if (!event.image_url) return [event.id, null] as const;
-          const theme = await sampleImageColor(event.image_url);
-          return [event.id, theme] as const;
-        })
-      );
-
-      if (!isActive) return;
-      setEventThemes((prev) => {
-        const next = { ...prev };
-        entries.forEach(([id, theme]) => {
-          if (theme) {
-            next[id] = theme;
-          }
-        });
-        return next;
-      });
-    };
-
-    if (upcomingEvents.length || featuredEvents.length) {
-      hydrateThemes();
-    }
-
-    return () => {
-      isActive = false;
-    };
-  }, [upcomingEvents, justAddedEvents, featuredEvents]);
-
-  const compactDate = (dateString?: string) => {
-    if (!dateString || dateString === "9999-12-31") {
-      return { mon: "TBA", day: "", wk: "" };
-    }
-    const d = new Date(`${dateString}T00:00:00`);
-    if (Number.isNaN(d.getTime())) {
-      return { mon: "TBA", day: "", wk: "" };
-    }
-    return {
-      mon: d.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
-      day: d.getDate(),
-      wk: d.toLocaleDateString("en-US", {
-        weekday: "short",
-      }).toUpperCase(),
-    };
-  };
-
-  const tickerItems = useMemo(() => {
-    return upcomingEvents.slice(0, 12);
-  }, [upcomingEvents]);
+  const spotifyPlaylist = useMemo(
+    () => playlists.find((p) => p.platform?.toLowerCase() === "spotify" && p.visible),
+    [playlists]
+  );
 
   return (
-    <div className="min-h-screen font-sans bg-black flex flex-col justify-between">
-      <header className="relative z-0 h-screen flex items-center justify-center text-center overflow-hidden">
-        <video 
-          autoPlay 
-          muted 
-          loop 
-          playsInline 
-          className="absolute inset-0 w-full h-full object-cover -z-10 brightness-[0.4]"
-        >
-          <source src="/videos/header-video.mp4" type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
+    <div className="min-h-screen font-[family-name:var(--font-work-sans)] bg-[#FAF1E1] text-[#2A2118]">
 
-        <div className="relative z-10 p-8 max-w-4xl mx-auto">
-          <h1 className="font-serif-display text-5xl md:text-7xl text-white mb-4 drop-shadow-lg tracking-tight">
-            Dead Wax Dialogues
-          </h1>
-          <p className="text-xl md:text-2xl font-light text-zinc-300 mb-10 drop-shadow-md">
-            A vinyl-focused listening lounge, jukebox, and community.
-          </p>
-
-          <nav className="flex gap-4 justify-center flex-wrap mt-8">
-            <Link href="/about" className={buttonClass}>
-              About
-            </Link>
-            <Link href="/events/events-page" className={buttonClass}>
-              Events
-            </Link>
-            <Link href="/games" className={buttonClass}>
-              Games
-            </Link>
-            <Link href="/dj-sets" className={buttonClass}>
-              DJ Sets
-            </Link>
-            <Link href="/dialogues" className={buttonClass}>
-              Dialogues
-            </Link>
-            <Link href="/merch" className={buttonClass}>
-              Merch
-            </Link>
-
-            {/* Original Admin button - only shows if Supabase session is active */}
-            {session && (
+      {/* HERO */}
+      <Container size="xl">
+        <div className="flex flex-col md:flex-row items-center gap-12 md:gap-16 py-16 md:py-24">
+          <div className="flex-1 min-w-0">
+            <div className="inline-block border-2 border-dashed border-[#C1502E] rounded-md px-4 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-[#C1502E] mb-6 -rotate-1">
+              Spinning 70s&ndash;90s &middot; {RESIDENCY_VENUE}
+            </div>
+            <h1 className="font-[family-name:var(--font-alfa-slab)] text-4xl sm:text-5xl md:text-6xl leading-[1.08] mb-6 text-[#2A2118]">
+              The needle drops every {RESIDENCY_NIGHT}.
+            </h1>
+            <p className="text-lg md:text-xl leading-relaxed text-[#4A3D2C] max-w-xl mb-9">
+              Pop, rock, and dance cuts from the 70s through the 90s &mdash; played warm, played loud enough, never shouted at you once.
+            </p>
+            <div className="flex gap-4 flex-wrap">
               <Link
-                href="/admin/admin-dashboard"
-                className="px-6 py-3 bg-blue-900/40 text-blue-200 rounded-full font-medium hover:bg-blue-800/60 transition-colors backdrop-blur-sm border border-blue-400/20"
+                href="/events/events-page"
+                className="px-7 py-3.5 bg-[#C1502E] text-[#FAF1E1] rounded-full font-bold text-sm hover:bg-[#9C3F22] transition-colors"
               >
-                Admin
+                See Upcoming Nights
               </Link>
-            )}
-          </nav>
-        </div>
-
-      </header>
-
-      {/* Invisible Admin Link: 
-        Hidden in the bottom-left corner. 
-        No visual footprint, but cursor changes to pointer on hover.
-      */}
-      <Link 
-        href="/admin/" 
-        className="fixed bottom-16 left-0 w-8 h-8 opacity-0 cursor-default hover:cursor-pointer z-50"
-        aria-hidden="true"
-        title="Admin Access"
-      >
-        .
-      </Link>
-
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-black/70 backdrop-blur-md">
-        <Container size="xl">
-          <div className="flex items-center gap-3 py-3 text-white">
-            <Link
-              href="/events/events-page"
-              className="text-xs uppercase tracking-[0.3em] font-semibold text-white/60 hover:text-white transition-colors"
+              <Link
+                href="/about"
+                className="px-7 py-3.5 bg-transparent text-[#2A2118] rounded-full font-bold text-sm border-2 border-[#2A2118] hover:opacity-65 transition-opacity"
+              >
+                Book a Private Event
+              </Link>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0 w-full max-w-md md:max-w-none relative pt-3">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[18px] h-[18px] rounded-full bg-[#2F7A78] border-2 border-[#2A2118] z-10" />
+            <div
+              className="w-full aspect-[4/5] rounded-2xl border-[3px] border-[#2A2118] flex items-center justify-center overflow-hidden rotate-[1.2deg]"
+              style={{
+                background:
+                  "repeating-linear-gradient(135deg, #EFC98A, #EFC98A 18px, #E8A93C 18px, #E8A93C 36px)",
+                boxShadow: "10px 10px 0 rgba(42,33,24,0.12)",
+              }}
             >
-              Events
-            </Link>
-            <div className="h-3 w-px bg-white/20" />
-            {loadingEvents ? (
-              <div className="text-sm text-white/60">Loading upcoming events…</div>
-            ) : (
-              <div className="relative flex-1 overflow-hidden">
-                <div className="ticker-track">
-                  {[...tickerItems, ...tickerItems].map((event, index) => {
-                    const date = compactDate(event.date);
-                    const tba =
-                      !event.date ||
-                      event.date === "" ||
-                      event.date === "9999-12-31";
-                    const theme = eventThemes[event.id] || DEFAULT_THEME;
-                    const displayTitle = getDisplayTitle(event);
-
-                    return (
-                      <Link
-                        key={`${event.id}-${index}`}
-                        href={`/events/event-detail/${event.id}`}
-                        className="ticker-item group"
-                      >
-                        <span className="ticker-text">
-                          <span
-                            className="inline-flex items-center justify-center w-2 h-2 rounded-full mr-2"
-                            style={{ background: theme.accent }}
-                          />
-                          <span
-                            className="text-white/70 text-sm font-semibold"
-                            style={{ color: theme.accent }}
-                          >
-                            {tba ? "TBA" : `${date.mon} ${date.day}`}
-                          </span>
-                          <span
-                            className="text-white font-semibold ml-3"
-                            dangerouslySetInnerHTML={{
-                              __html: formatEventText(displayTitle),
-                            }}
-                          />
-                        </span>
-                      </Link>
-                    );
-                  })}
-                </div>
+              <div className="absolute inset-[18px] rounded-xl bg-[#FAF1E1]/90 flex items-center justify-center text-center p-6">
+                <span className="text-sm font-bold uppercase tracking-wider text-[#8F3A1F]">
+                  Photo coming soon &mdash; Steve at the decks, {RESIDENCY_VENUE}
+                </span>
               </div>
-            )}
+            </div>
+          </div>
+        </div>
+      </Container>
+
+      {/* RESIDENCY CALLOUT */}
+      <Container size="xl">
+        <div
+          className="relative bg-[#4FB8E8] rounded-xl px-8 py-10 md:px-16 md:py-14 flex items-center justify-between gap-8 flex-wrap -rotate-[0.6deg] mb-16 md:mb-20"
+          style={{ boxShadow: "10px 10px 0 rgba(42,33,24,0.14)" }}
+        >
+          <div className="absolute -top-3.5 left-14 w-6 h-6 rounded-full bg-[#E8A93C] border-2 border-[#2A2118]" />
+          <div>
+            <div className="text-xs font-bold uppercase tracking-[0.16em] text-[#2A2118]/60 mb-3">
+              The Residency
+            </div>
+            <div className="font-[family-name:var(--font-alfa-slab)] text-2xl md:text-4xl text-[#2A2118] leading-tight">
+              Every {RESIDENCY_NIGHT} &mdash; {RESIDENCY_VENUE}
+            </div>
+            <div className="text-sm text-[#2A2118]/70 mt-3 max-w-md">
+              Same bar, same crate of records, same good time. Pull up a stool and put in a request.
+            </div>
+          </div>
+          <a
+            href={RESIDENCY_MAP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-7 py-3.5 bg-[#2A2118] text-[#FAF1E1] rounded-full font-bold text-sm whitespace-nowrap hover:opacity-90 transition-opacity"
+          >
+            Get Directions
+          </a>
+        </div>
+      </Container>
+
+      {/* COMING UP */}
+      <Container size="xl">
+        <div className="mb-16 md:mb-20">
+          <div className="flex items-baseline justify-between mb-7">
+            <div className="font-[family-name:var(--font-alfa-slab)] text-2xl md:text-3xl text-[#2A2118]">
+              Coming Up
+            </div>
+            <Link href="/events/events-page" className="text-sm font-bold text-[#C1502E] hover:text-[#8F3A1F]">
+              Full calendar &rarr;
+            </Link>
+          </div>
+
+          {loadingEvents ? (
+            <div className="text-[#6B5B45]">Loading upcoming nights&hellip;</div>
+          ) : upcomingEvents.length === 0 ? (
+            <div className="text-[#6B5B45]">
+              Nothing on the calendar yet &mdash; check back soon, or catch the standing {RESIDENCY_NIGHT} residency at {RESIDENCY_VENUE}.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {upcomingEvents.map((event, i) => (
+                <Link
+                  key={event.id}
+                  href={`/events/event-detail/${event.id}`}
+                  className={`group bg-white border-2 border-[#2A2118] rounded-[10px] p-6 transition-transform duration-150 hover:!rotate-0 hover:-translate-y-1 ${CARD_TILTS[i % CARD_TILTS.length]}`}
+                  style={{ boxShadow: "6px 6px 0 rgba(42,33,24,0.10)" }}
+                >
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#C1502E] mb-2.5">
+                    {compactDate(event.date)}
+                  </div>
+                  <div
+                    className="text-[17px] font-bold mb-1.5 leading-snug"
+                    dangerouslySetInnerHTML={{ __html: formatEventText(getDisplayTitle(event)) }}
+                  />
+                  <div className="text-sm text-[#6B5B45]">{event.location || RESIDENCY_VENUE}</div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </Container>
+
+      {/* BIO */}
+      <Container size="xl">
+        <div className="flex flex-col sm:flex-row gap-8 items-start mb-16 md:mb-20">
+          <div className="w-full sm:w-[220px] flex-shrink-0 text-xs font-bold uppercase tracking-[0.14em] text-[#2F7A78]">
+            The Short Version
+          </div>
+          <p className="flex-1 text-xl md:text-[22px] leading-relaxed max-w-3xl">
+            Steve&rsquo;s been building crossfades since he was taping songs off the radio as a kid. These days you&rsquo;ll find him behind the decks at {RESIDENCY_VENUE}, spinning the deep cuts and just-as-good B-sides from the 70s through the 90s &mdash; pop, rock, a little disco, always danceable.
+          </p>
+        </div>
+      </Container>
+
+      {/* VINYL GAME DECK TEASER */}
+      <Container size="xl">
+        <div
+          className="relative bg-[#6E7F5C] rounded-2xl px-8 py-10 md:px-16 md:py-14 flex items-center gap-10 flex-wrap rotate-[0.5deg] mb-16 md:mb-20"
+          style={{ boxShadow: "10px 10px 0 rgba(42,33,24,0.10)" }}
+        >
+          <div className="absolute -top-3.5 right-16 w-6 h-6 rounded-full bg-[#C1502E] border-2 border-[#2A2118]" />
+          <div className="flex-1 min-w-[280px]">
+            <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#FAF1E1]/85 mb-3.5">
+              Things To Do At A Dead Wax Night
+            </div>
+            <div className="font-[family-name:var(--font-alfa-slab)] text-2xl md:text-[30px] text-[#FAF1E1] mb-3.5">
+              Bring a team. We brought the games.
+            </div>
+            <p className="text-base leading-relaxed text-[#FAF1E1]/90 max-w-md mb-5">
+              Vinyl Game Deck turns the night into a party &mdash; right alongside the set, no extra cover charge.
+            </p>
+            <div className="flex gap-2.5 flex-wrap mb-6">
+              {["Vinyl Bingo", "Cover Art Clue Chase", "Decade Dash"].map((name) => (
+                <span key={name} className="bg-[#FAF1E1] text-[#2A2118] px-4 py-2 rounded-full text-[13px] font-bold">
+                  {name}
+                </span>
+              ))}
+            </div>
+            <Link
+              href="/games"
+              className="inline-block px-6 py-3.5 bg-[#C1502E] text-[#FAF1E1] rounded-full font-bold text-sm hover:bg-[#9C3F22] transition-colors"
+            >
+              Explore Vinyl Game Deck &rarr;
+            </Link>
+          </div>
+          <div className="w-full sm:w-[280px] h-[180px] sm:h-[200px] flex-shrink-0 rounded-xl bg-[#FAF1E1] border-[3px] border-[#2A2118] flex items-center justify-center text-center p-4 -rotate-[1.8deg]">
+            <span className="text-[13px] font-bold uppercase tracking-wider text-[#8F3A1F]">
+              Photo coming soon &mdash; Vinyl Bingo on a brewery table
+            </span>
+          </div>
+        </div>
+      </Container>
+
+      {/* DIALOGUES TEASER */}
+      {posts.length > 0 && (
+        <Container size="xl">
+          <div className="mb-16 md:mb-20">
+            <div className="flex items-baseline justify-between mb-7">
+              <div className="font-[family-name:var(--font-alfa-slab)] text-2xl md:text-3xl text-[#2A2118]">
+                From The Dialogues
+              </div>
+              <Link href="/dialogues" className="text-sm font-bold text-[#C1502E] hover:text-[#8F3A1F]">
+                Read more &rarr;
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {posts.map((post, i) => (
+                <a
+                  key={post.guid || post.link}
+                  href={post.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`group block bg-white border-2 border-[#2A2118] rounded-xl overflow-hidden transition-transform duration-150 hover:!rotate-0 hover:-translate-y-1 ${CARD_TILTS[i % CARD_TILTS.length]}`}
+                  style={{ boxShadow: "6px 6px 0 rgba(42,33,24,0.08)" }}
+                >
+                  <div
+                    className="h-[150px] bg-[#D8C9AE] bg-cover bg-center"
+                    style={
+                      extractFirstImg(post)
+                        ? { backgroundImage: `url(${extractFirstImg(post)})` }
+                        : undefined
+                    }
+                  />
+                  <div className="p-5">
+                    <div className="text-base font-bold mb-2 leading-snug line-clamp-2">{post.title}</div>
+                    <div className="text-sm text-[#6B5B45] leading-relaxed line-clamp-3">
+                      {post.contentSnippet || ""}
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
           </div>
         </Container>
-        <style jsx>{`
-          .ticker-track {
-            display: flex;
-            align-items: center;
-            gap: 1.75rem;
-            width: max-content;
-            animation: ticker-scroll 40s linear infinite;
-          }
-          .ticker-track:hover {
-            animation-play-state: paused;
-          }
-          .ticker-item {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.75rem;
-            white-space: nowrap;
-            padding-right: 1rem;
-            color: inherit;
-          }
-          .ticker-item:hover .ticker-text {
-            color: #fff;
-          }
-          .ticker-text {
-            display: inline-flex;
-            align-items: baseline;
-            transition: color 0.2s ease;
-          }
-          @keyframes ticker-scroll {
-            0% {
-              transform: translateX(0);
-            }
-            100% {
-              transform: translateX(-50%);
-            }
-          }
-          @media (prefers-reduced-motion: reduce) {
-            .ticker-track {
-              animation: none;
-            }
-          }
-        `}</style>
-      </div>
+      )}
+
+      {/* CONNECT */}
+      <Container size="xl">
+        <div className="text-center pb-16 md:pb-20">
+          <div className="font-[family-name:var(--font-alfa-slab)] text-2xl md:text-[30px] text-[#2A2118] mb-2.5">
+            Say Hi
+          </div>
+          <div className="text-base text-[#6B5B45] mb-9">
+            Playlists, photos, and the occasional bad pun.
+          </div>
+          <div className="flex justify-center gap-4 flex-wrap mb-11">
+            {socials
+              .filter((s) => s.name !== "Email")
+              .map(({ name, url, Icon }) => (
+                <a
+                  key={name}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={name}
+                  className="w-12 h-12 rounded-full bg-[#2A2118] text-[#FAF1E1] flex items-center justify-center hover:-translate-y-0.5 hover:-rotate-[4deg] transition-transform"
+                >
+                  <Icon size={20} />
+                </a>
+              ))}
+          </div>
+
+          <div
+            className="max-w-xl mx-auto bg-[#2A2118] rounded-xl px-7 py-6 flex items-center gap-4 text-left -rotate-[0.5deg]"
+            style={{ boxShadow: "8px 8px 0 rgba(42,33,24,0.10)" }}
+          >
+            <div className="w-11 h-11 rounded-full bg-[#2F7A78] flex items-center justify-center flex-shrink-0">
+              <SiSpotify size={18} color="#FAF1E1" />
+            </div>
+            <div className="min-w-0">
+              {spotifyPlaylist ? (
+                <div
+                  className="text-sm text-[#FAF1E1] [&_iframe]:rounded-lg [&_iframe]:w-full"
+                  dangerouslySetInnerHTML={{
+                    __html: (spotifyPlaylist.embed_html || spotifyPlaylist.embed_url || "").replace(
+                      /allowfullscreen="?"?/g,
+                      ""
+                    ),
+                  }}
+                />
+              ) : (
+                <>
+                  <div className="text-sm font-bold text-[#FAF1E1]">Follow the playlist on Spotify</div>
+                  <div className="text-xs text-[#D8C9AE]">The Dead Wax Dialogues rotation, updated weekly</div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </Container>
     </div>
   );
 }
-// AUDIT: inspected, no changes.
