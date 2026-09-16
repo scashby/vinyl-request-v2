@@ -105,6 +105,33 @@ merging to `main`.
     restricting to whitelisted domains. Unclear yet whether this also
     happens on the real `deadwaxdialogues.com` domain; worth checking
     there specifically.
+- **Events, Games, DJ Sets, and event-detail restyled too.** These were
+  initially left out — Events specifically because "we already have a
+  pretty good events page setup" (said before any v2 direction existed)
+  got misread as "leave the styling alone forever," not "the
+  functionality doesn't need rework." Games and DJ Sets were a plain
+  oversight. All three were still on old v1 styling (Events/Games:
+  `bg-black` + neon cyan `#00c4ff`, the "hands in the air" club look
+  explicitly *not* wanted for this brand; DJ Sets: old white/gray v1).
+  Now theme-aware and using the shared card language, same recipe as
+  About/Dialogues/Merch. Events in particular had several very
+  club/cyberpunk-coded visual bits (a skewed radial-gradient "Book DJ
+  Gigs" ad, a neon retro-grid-floor "Latest DJ Sets" panel) rewritten
+  into the calmer brand language rather than just palette-swapped.
+  - Games is a **server component** (fetches via `supabaseAdmin`
+    directly, not client-side) — added `src/lib/getActiveThemeServer.ts`
+    as the server-side counterpart to `useActiveTheme`, kept in its own
+    file so `theme.ts` (imported by client components) never pulls in
+    the service-role Supabase client.
+  - On `event-detail`, left `QueueSection` and `EventDJSets` components
+    untouched — `QueueSection` in particular may double as a live
+    venue-screen display, which is a different context than "match the
+    marketing site," and restyling it wasn't asked for.
+  - Verified via real production build again; one more pre-existing,
+    unrelated, local-only failure surfaced: the Google Maps embed on
+    event-detail 403s locally because that API key is domain-restricted
+    and `localhost` isn't on the allowlist — same code, will work on the
+    real domain.
 
 **📋 PLANNED / BACKLOG:**
 - Add a real photo of Steve (hero + Game Deck teaser currently show an
