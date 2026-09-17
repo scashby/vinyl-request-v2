@@ -88,24 +88,6 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
             </ul>
           </div>
 
-          {/* Collection Management */}
-          <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-            <h4 className="text-sm font-semibold text-purple-800 mb-2">🎵 Collection</h4>
-            <div className="space-y-2">
-              <Link 
-                href="/edit-collection"
-                target="_blank"
-                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/edit-collection" 
-                    ? "bg-purple-700 text-white" 
-                    : "bg-purple-600 text-white hover:bg-purple-700"
-                }`}
-              >
-                📚 Browse & Edit
-              </Link>
-            </div>
-          </div>
-
           {/* Merchandise */}
           <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
             <h4 className="text-sm font-semibold text-emerald-800 mb-2">💰 Merchandise</h4>
@@ -220,33 +202,6 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
               >
                 🎧 DJ Sets
               </Link>
-              <Link 
-                href="/admin/edit-queue"
-                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/admin/edit-queue" 
-                    ? "bg-orange-700 text-white" 
-                    : "bg-orange-600 text-white hover:bg-orange-700"
-                }`}
-              >
-                🎵 Queues
-              </Link>
-            </div>
-          </div>
-
-          {/* Games */}
-          <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            <h4 className="text-sm font-semibold text-slate-800 mb-2">🎲 Games</h4>
-            <div className="space-y-2">
-              <Link
-                href="/admin/games"
-                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/admin/games" || pathname?.startsWith("/admin/games/")
-                    ? "bg-slate-700 text-white"
-                    : "bg-slate-600 text-white hover:bg-slate-700"
-                }`}
-              >
-                🎱 Game Admin Center
-              </Link>
             </div>
           </div>
 
@@ -285,16 +240,6 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                 🛍️ Merch Page
               </Link>
               <Link
-                href="/admin/playlists"
-                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/admin/playlists" 
-                    ? "bg-green-700 text-white" 
-                    : "bg-green-600 text-white hover:bg-green-700"
-                }`}
-              >
-                🎶 Playlists
-              </Link>
-              <Link 
                 href="/admin/socials"
                 className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
                   pathname === "/admin/socials" 

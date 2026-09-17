@@ -4,8 +4,10 @@
 // Content for each section below comes from the `homepage_sections` table
 // (editable at /admin/edit-home), falling back to DEFAULT_SECTIONS if a row
 // doesn't exist yet (e.g. before sql/create-homepage-sections.sql has been
-// run). Events, Dialogues posts, and the Spotify playlist stay sourced from
-// their own existing tables/feeds — only the static copy lives here.
+// run). Events and Dialogues posts stay sourced from their own existing
+// tables/feeds — only the static copy lives here. The Connect section's
+// Spotify block always shows its static fallback (linking to the Spotify
+// profile URL in the socials list) now that /admin/playlists is retired.
 
 "use client";
 
@@ -40,20 +42,11 @@ interface BlogPost {
   "content:encoded"?: string;
 }
 
-interface Playlist {
-  id: number;
-  platform: string;
-  embed_html?: string;
-  embed_url?: string;
-  visible: boolean;
-}
-
 export default function Page() {
   const [sections, setSections] = useState<HomepageSection<Record<string, unknown>>[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [posts, setPosts] = useState<BlogPost[]>([]);
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const { cssVars } = useActiveTheme();
 
   useEffect(() => {
@@ -121,13 +114,6 @@ export default function Page() {
       .catch((err) => console.error("Error loading Dialogues posts:", err));
   }, []);
 
-  useEffect(() => {
-    fetch("/api/playlists")
-      .then((res) => res.json())
-      .then((data: Playlist[]) => setPlaylists(data ?? []))
-      .catch((err) => console.error("Error loading playlists:", err));
-  }, []);
-
   const upcomingEvents = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const filtered = events.filter((event) => {
@@ -147,11 +133,6 @@ export default function Page() {
 
     return sorted.slice(0, 4);
   }, [events]);
-
-  const spotifyPlaylist = useMemo(
-    () => playlists.find((p) => p.platform?.toLowerCase() === "spotify" && p.visible),
-    [playlists]
-  );
 
   const s = resolveSections(sections);
   const tokens = { night: s.residency.data.night, venue: s.residency.data.venue };
@@ -177,9 +158,7 @@ export default function Page() {
       {isVisible(s.dialogues_teaser.row) && (
         <DialoguesTeaserSection data={s.dialogues_teaser.data} posts={posts} />
       )}
-      {isVisible(s.connect.row) && (
-        <ConnectSection data={s.connect.data} spotifyPlaylist={spotifyPlaylist} />
-      )}
+      {isVisible(s.connect.row) && <ConnectSection data={s.connect.data} />}
     </div>
   );
 }

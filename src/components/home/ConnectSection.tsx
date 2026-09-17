@@ -3,21 +3,8 @@ import { Container } from 'components/ui/Container';
 import { getSocialIcon } from 'src/lib/socialIcons';
 import type { ConnectData } from 'src/lib/homeContent';
 
-interface Playlist {
-  id: number;
-  platform: string;
-  embed_html?: string;
-  embed_url?: string;
-  visible: boolean;
-}
-
-export function ConnectSection({
-  data,
-  spotifyPlaylist,
-}: {
-  data: ConnectData;
-  spotifyPlaylist?: Playlist;
-}) {
+export function ConnectSection({ data }: { data: ConnectData }) {
+  const spotifyUrl = data.socials.find((s) => s.name === 'Spotify')?.url;
   return (
     <Container size="xl">
       <div className="text-center pb-16 md:pb-20">
@@ -43,32 +30,21 @@ export function ConnectSection({
           })}
         </div>
 
-        <div
-          className="max-w-xl mx-auto rounded-xl px-7 py-6 flex items-center gap-4 text-left -rotate-[0.5deg] bg-[var(--dwd-ink)]"
+        <a
+          href={spotifyUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="max-w-xl mx-auto rounded-xl px-7 py-6 flex items-center gap-4 text-left -rotate-[0.5deg] bg-[var(--dwd-ink)] hover:-translate-y-0.5 transition-transform"
           style={{ boxShadow: '8px 8px 0 rgba(0,0,0,0.10)' }}
         >
           <div className="w-11 h-11 rounded-full bg-[var(--dwd-accent-2)] flex items-center justify-center flex-shrink-0">
             <SiSpotify size={18} color="var(--dwd-bg)" />
           </div>
           <div className="min-w-0">
-            {spotifyPlaylist ? (
-              <div
-                className="text-sm text-[var(--dwd-bg)] [&_iframe]:rounded-lg [&_iframe]:w-full"
-                dangerouslySetInnerHTML={{
-                  __html: (spotifyPlaylist.embed_html || spotifyPlaylist.embed_url || '').replace(
-                    /allowfullscreen="?"?/g,
-                    ''
-                  ),
-                }}
-              />
-            ) : (
-              <>
-                <div className="text-sm font-bold text-[var(--dwd-bg)]">{data.spotify_fallback_label}</div>
-                <div className="text-xs text-[var(--dwd-bg)] opacity-70">{data.spotify_fallback_sublabel}</div>
-              </>
-            )}
+            <div className="text-sm font-bold text-[var(--dwd-bg)]">{data.spotify_fallback_label}</div>
+            <div className="text-xs text-[var(--dwd-bg)] opacity-70">{data.spotify_fallback_sublabel}</div>
           </div>
-        </div>
+        </a>
       </div>
     </Container>
   );

@@ -8,7 +8,6 @@ import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import AdminImageSelectorModal from 'src/components/admin/AdminImageSelectorModal';
 import { supabase } from 'src/lib/supabaseClient';
-import type { Crate, SmartRules } from 'src/types/crate';
 import type { Database } from 'types/supabase';
 import {
   defaultEventTypeConfig,
@@ -17,7 +16,6 @@ import {
   mergeEventTypeConfig,
 } from 'src/lib/eventTypeConfig';
 
-const formatList = ['Vinyl', 'Cassettes', 'CD', '45s', '8-Track'];
 const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
 
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
@@ -29,7 +27,7 @@ type ImageFocusPoint = { x: number; y: number };
 
 const DEFAULT_IMAGE_FOCUS: ImageFocusPoint = { x: 50, y: 50 };
 
-const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'venue_logo_url', 'info', 'info_url', 'queue', 'recurrence', 'crate', 'formats'];
+const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'recurrence'];
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 const GOOGLE_MAPS_LIBRARIES = 'places';
 let googleMapsScriptPromise: Promise<void> | null = null;
@@ -93,15 +91,9 @@ interface EventData {
   time: string;
   location: string;
   image_url: string;
-  venue_logo_url: string;
   info: string;
   info_url: string;
-  has_queue: boolean;
-  queue_types: string[];
-  allowed_formats: string[];
-  // Replaced legacy tags with Crate ID
-  crate_id?: number | null;
-  
+
   is_recurring: boolean;
   recurrence_pattern: string;
   recurrence_interval: number;
@@ -135,24 +127,6 @@ type EditEventFormProps = {
   onSaved?: (event: SavedEventSummary) => void;
   onCancel?: () => void;
 };
-
-const EVENT_GAME_OPTIONS = [
-  { slug: 'bingo', label: 'Music Bingo' },
-  { slug: 'music-trivia', label: 'Music Trivia' },
-  { slug: 'name-that-tune', label: 'Name That Tune' },
-  { slug: 'bracket-battle', label: 'Bracket Battle' },
-  { slug: 'needle-drop-roulette', label: 'Needle Drop Roulette' },
-  { slug: 'cover-art-clue-chase', label: 'Cover Art Clue Chase' },
-  { slug: 'crate-categories', label: 'Crate Categories' },
-  { slug: 'decade-dash', label: 'Decade Dash' },
-  { slug: 'genre-imposter', label: 'Genre Imposter' },
-  { slug: 'sample-detective', label: 'Sample Detective' },
-  { slug: 'lyric-gap-relay', label: 'Lyric Gap Relay' },
-  { slug: 'wrong-lyric-challenge', label: 'Wrong Lyric Challenge' },
-  { slug: 'artist-alias', label: 'Artist Alias' },
-  { slug: 'original-or-cover', label: 'Original or Cover' },
-  { slug: 'back-to-back-connection', label: 'Back-to-Back Connection' },
-] as const;
 
 // Utility function to generate recurring events
 function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<EventData, 'id'>[] {
@@ -261,13 +235,8 @@ function buildEventDataFromDbEvent(dbEvent: DbEvent): EventData {
     time: dbEvent.time ?? '',
     location: dbEvent.location ?? '',
     image_url: dbEvent.image_url ?? '',
-    venue_logo_url: dbEvent.venue_logo_url ?? '',
     info: dbEvent.info ?? '',
     info_url: dbEvent.info_url ?? '',
-    has_queue: !!dbEvent.has_queue,
-    queue_types: Array.isArray(dbEvent.queue_types) ? dbEvent.queue_types : [],
-    allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
-    crate_id: dbEvent.crate_id ?? null,
     is_recurring: !!dbEvent.is_recurring,
     recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
     recurrence_interval: dbEvent.recurrence_interval || 1,
@@ -288,32 +257,12 @@ const OVERRIDE_FIELDS: Array<{
   { key: 'time', label: 'Time' },
   { key: 'location', label: 'Location' },
   { key: 'image_url', label: 'Image URL' },
-  { key: 'venue_logo_url', label: 'Venue Logo URL' },
   { key: 'info', label: 'Info' },
   { key: 'info_url', label: 'Info URL' },
-  { key: 'has_queue', label: 'Queue Enabled' },
-  { key: 'queue_types', label: 'Queue Types' },
-  { key: 'allowed_formats', label: 'Allowed Formats' },
-  { key: 'crate_id', label: 'Crate' },
   { key: 'is_featured_grid', label: 'Featured Grid' },
   { key: 'is_featured_upnext', label: 'Featured Up Next' },
   { key: 'featured_priority', label: 'Featured Priority' },
 ];
-
-function normalizeArrayValue(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item).trim()).filter(Boolean).sort();
-  }
-  if (typeof value === 'string') {
-    return value
-      .replace(/[{}]/g, '')
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .sort();
-  }
-  return [];
-}
 
 function formatDiffValue(value: unknown): string {
   if (value === null || typeof value === 'undefined' || value === '') return '—';
@@ -338,8 +287,7 @@ export default function EditEventForm({
         ? parsedQueryId
         : null;
   const router = useRouter();
-  
-  const [crates, setCrates] = useState<Crate[]>([]);
+
   const [editMode, setEditMode] = useState<'all' | 'future' | 'single'>('all');
   const [isPartOfSeries, setIsPartOfSeries] = useState(false);
   const [isParentEvent, setIsParentEvent] = useState(false);
@@ -360,10 +308,8 @@ export default function EditEventForm({
   } | null>(null);
   const [isRegeneratingChildren, setIsRegeneratingChildren] = useState(false);
   const [showImageSelector, setShowImageSelector] = useState(false);
-  const [showVenueLogoSelector, setShowVenueLogoSelector] = useState(false);
   const [imageFocusCover, setImageFocusCover] = useState<ImageFocusPoint>(DEFAULT_IMAGE_FOCUS);
   const [imageFocusSquare, setImageFocusSquare] = useState<ImageFocusPoint>(DEFAULT_IMAGE_FOCUS);
-  const [selectedGameSlug, setSelectedGameSlug] = useState<string>(EVENT_GAME_OPTIONS[0]?.slug ?? 'bingo');
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
     normalizeEventTypeConfig(defaultEventTypeConfig)
   );
@@ -376,13 +322,8 @@ export default function EditEventForm({
     time: '',
     location: '',
     image_url: '',
-    venue_logo_url: '',
     info: '',
     info_url: '',
-    has_queue: false,
-    queue_types: [],
-    allowed_formats: [] as string[],
-    crate_id: null,
     is_recurring: false,
     recurrence_pattern: 'weekly',
     recurrence_interval: 1,
@@ -421,28 +362,7 @@ export default function EditEventForm({
   const showInfo = isFieldEnabled('info');
   const showInfoUrl = isFieldEnabled('info_url');
   const showEventImage = isFieldEnabled('image_url');
-  const showVenueLogo = true;
   const locationInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Fetch Available Crates
-  useEffect(() => {
-    const fetchCrates = async () => {
-      const { data, error } = await supabase
-        .from('crates')
-        .select('*')
-        .order('sort_order', { ascending: true });
-      
-      if (!error && data) {
-        const parsed = data.map((row) => ({
-          ...row,
-          smart_rules: (row.smart_rules as unknown as SmartRules | null) ?? null,
-        }));
-        setCrates(parsed as Crate[]);
-      }
-    };
-    
-    fetchCrates();
-  }, []);
 
   useEffect(() => {
     if (!GOOGLE_MAPS_API_KEY || !locationInputRef.current) return;
@@ -599,15 +519,10 @@ export default function EditEventForm({
           ...copiedEvent,
           event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
           event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
-          allowed_formats: normalizeStringArray(copiedEvent?.allowed_formats),
-          has_queue: !!copiedEvent?.has_queue,
-          queue_types: Array.isArray(copiedEvent?.queue_types) ? copiedEvent!.queue_types : [],
-          crate_id: copiedEvent?.crate_id || null,
           title: copiedEvent?.title ? `${copiedEvent.title} (Copy)` : '',
           time: copiedEvent?.time ?? '',
           location: copiedEvent?.location ?? '',
           image_url: copiedEvent?.image_url ?? '',
-          venue_logo_url: copiedEvent?.venue_logo_url ?? '',
           info: copiedEvent?.info ?? '',
           info_url: copiedEvent?.info_url ?? '',
           is_recurring: false
@@ -634,18 +549,13 @@ export default function EditEventForm({
             ...dbEvent,
             event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
             event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
-            allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
-            has_queue: !!dbEvent.has_queue,
-            queue_types: Array.isArray(dbEvent.queue_types) ? dbEvent.queue_types : [],
-            crate_id: dbEvent.crate_id || null,
             title: dbEvent.title ?? '',
             time: dbEvent.time ?? '',
             location: dbEvent.location ?? '',
             image_url: dbEvent.image_url ?? '',
-            venue_logo_url: dbEvent.venue_logo_url ?? '',
             info: dbEvent.info ?? '',
             info_url: dbEvent.info_url ?? '',
-            
+
             is_recurring: dbEvent.is_recurring || false,
             recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
             recurrence_interval: dbEvent.recurrence_interval || 1,
@@ -721,11 +631,9 @@ export default function EditEventForm({
           ? parseInt(value) || 1
           : name === 'featured_priority'
             ? (value === '' ? null : parseInt(value))
-            : name === 'crate_id'
-              ? (value === '' ? null : parseInt(value))
-              : name === 'image_url' || name === 'venue_logo_url'
-                ? value.trim()
-                : value,
+            : name === 'image_url'
+              ? value.trim()
+              : value,
       ...(name === 'event_type' ? { event_subtype: '' } : {}),
       ...(name === 'date' && !value ? { is_recurring: false, recurrence_end_date: '' } : {})
     }));
@@ -753,15 +661,10 @@ export default function EditEventForm({
         ...dbEvent,
         event_type: getTagValue(normalizedTags, EVENT_TYPE_TAG_PREFIX),
         event_subtype: getTagValue(normalizedTags, EVENT_SUBTYPE_TAG_PREFIX),
-        allowed_formats: normalizeStringArray(dbEvent.allowed_formats),
-        has_queue: !!dbEvent.has_queue,
-        queue_types: Array.isArray(dbEvent.queue_types) ? dbEvent.queue_types : [],
-        crate_id: dbEvent.crate_id || null,
         title: dbEvent.title ?? '',
         time: dbEvent.time ?? '',
         location: dbEvent.location ?? '',
         image_url: dbEvent.image_url ?? '',
-        venue_logo_url: dbEvent.venue_logo_url ?? '',
         info: dbEvent.info ?? '',
         info_url: dbEvent.info_url ?? '',
         is_recurring: dbEvent.is_recurring || false,
@@ -878,12 +781,6 @@ export default function EditEventForm({
       );
       if (!confirmed) return;
 
-      const normalizedFormats = baseEvent.allowed_formats
-        .map((format) => format.trim())
-        .filter(Boolean);
-      const normalizedQueueTypes = baseEvent.queue_types
-        .map((type) => type.trim())
-        .filter(Boolean);
       const allowedTags = [
         buildTag(EVENT_TYPE_TAG_PREFIX, baseEvent.event_type),
         buildTag(EVENT_SUBTYPE_TAG_PREFIX, baseEvent.event_subtype),
@@ -894,16 +791,9 @@ export default function EditEventForm({
         time: event.time,
         location: event.location,
         image_url: event.image_url || null,
-        venue_logo_url: event.venue_logo_url || null,
         info: event.info,
         info_url: event.info_url,
-        has_queue: event.has_queue,
-        queue_types: baseEvent.has_queue && normalizedQueueTypes.length > 0
-          ? normalizedQueueTypes
-          : null,
-        allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
         allowed_tags: allowedTags.length > 0 ? allowedTags : null,
-        crate_id: baseEvent.crate_id || null,
         parent_event_id: seriesParentId,
         is_recurring: false,
         is_featured_grid: !!event.is_featured_grid,
@@ -923,18 +813,8 @@ export default function EditEventForm({
     }
   };
 
-  const getEventFieldValue = (event: DbEvent, key: string) => {
-    switch (key) {
-      case 'queue_types':
-        return normalizeArrayValue(event.queue_types ?? []);
-      case 'allowed_formats':
-        return normalizeArrayValue(event.allowed_formats ?? []);
-      case 'crate_id':
-        return event.crate_id ?? null;
-      default:
-        return (event as unknown as Record<string, unknown>)[key];
-    }
-  };
+  const getEventFieldValue = (event: DbEvent, key: string) =>
+    (event as unknown as Record<string, unknown>)[key];
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, checked } = e.target;
@@ -943,22 +823,6 @@ export default function EditEventForm({
       [name]: checked,
       ...(name === 'is_recurring' && !checked ? { recurrence_end_date: '' } : {})
     }));
-  };
-
-  const handleFormatChange = (format: string, checked: boolean) => {
-    setEventData((prev) => {
-      const formats = [...prev.allowed_formats];
-      if (checked) return { ...prev, allowed_formats: [...formats, format] };
-      return { ...prev, allowed_formats: formats.filter((f) => f !== format) };
-    });
-  };
-
-  const handleQueueTypeChange = (queueType: string, checked: boolean) => {
-    setEventData((prev) => {
-      const types = [...prev.queue_types];
-      if (checked) return { ...prev, queue_types: [...types, queueType] };
-      return { ...prev, queue_types: types.filter((t) => t !== queueType) };
-    });
   };
 
   const applyDefaults = (defaults?: EventSubtypeDefaults, enabledList?: string[]) => {
@@ -972,19 +836,6 @@ export default function EditEventForm({
       ...(enabledFields.includes('time') && defaults.time ? { time: defaults.time } : {}),
       ...(enabledFields.includes('location') && defaults.location ? { location: defaults.location } : {}),
       ...(enabledFields.includes('image_url') && defaults.image_url ? { image_url: defaults.image_url } : {}),
-      ...(enabledFields.includes('venue_logo_url') && defaults.venue_logo_url
-        ? { venue_logo_url: defaults.venue_logo_url }
-        : {}),
-      ...(enabledFields.includes('formats') && defaults.allowed_formats
-        ? { allowed_formats: defaults.allowed_formats }
-        : {}),
-      ...(enabledFields.includes('crate') && typeof defaults.crate_id !== 'undefined'
-        ? { crate_id: defaults.crate_id }
-        : {}),
-      ...(enabledFields.includes('queue') && typeof defaults.has_queue === 'boolean'
-        ? { has_queue: defaults.has_queue }
-        : {}),
-      ...(enabledFields.includes('queue') && defaults.queue_types ? { queue_types: defaults.queue_types } : {}),
       ...(enabledFields.includes('recurrence') && typeof defaults.is_recurring === 'boolean'
         ? { is_recurring: defaults.is_recurring }
         : {}),
@@ -995,18 +846,6 @@ export default function EditEventForm({
         ? { recurrence_interval: defaults.recurrence_interval }
         : {}),
     }));
-  };
-
-  const linkableEventId = selectedSeriesEventId ?? editEventId;
-  const canOpenGameSetup = Number.isFinite(linkableEventId ?? NaN);
-
-  const handleOpenGameSetup = () => {
-    if (!canOpenGameSetup || !linkableEventId) {
-      alert('Save this event first, then open game setup.');
-      return;
-    }
-    const targetUrl = `/admin/games/${selectedGameSlug}?eventId=${linkableEventId}`;
-    window.open(targetUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1020,15 +859,8 @@ export default function EditEventForm({
         buildImageFocusTag(IMAGE_FOCUS_COVER_TAG_PREFIX, imageFocusCover),
         buildImageFocusTag(IMAGE_FOCUS_SQUARE_TAG_PREFIX, imageFocusSquare),
       ].filter(Boolean) as string[];
-      const normalizedFormats = eventData.allowed_formats
-        .map((format) => format.trim())
-        .filter(Boolean);
-      const normalizedQueueTypes = eventData.queue_types
-        .map((type) => type.trim())
-        .filter(Boolean);
       const normalizedImageUrl = normalizeOptionalText(eventData.image_url);
-      const normalizedVenueLogoUrl = normalizeOptionalText(eventData.venue_logo_url);
-      
+
       const payload: EventInsert = {
         allowed_tags: allowedTags.length > 0 ? allowedTags : null,
         title: eventData.title,
@@ -1036,16 +868,9 @@ export default function EditEventForm({
         time: eventData.time,
         location: eventData.location,
         image_url: normalizedImageUrl || null,
-        venue_logo_url: normalizedVenueLogoUrl || null,
         info: eventData.info,
         info_url: eventData.info_url,
-        has_queue: eventData.has_queue,
-        queue_types: eventData.has_queue && normalizedQueueTypes.length > 0
-          ? normalizedQueueTypes
-          : null,
-        allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
-        crate_id: eventData.crate_id || null,
-        
+
         is_recurring: isTBA ? false : eventData.is_recurring,
         ...(eventData.parent_event_id && editMode !== 'single' ? { parent_event_id: eventData.parent_event_id } : {}),
         is_featured_grid: !!eventData.is_featured_grid,
@@ -1077,19 +902,6 @@ export default function EditEventForm({
                const diffs = OVERRIDE_FIELDS.map((field) => {
                  const baseValue = (payload as Record<string, unknown>)[field.key];
                  const currentValue = getEventFieldValue(event, field.key);
-                 if (field.key === 'queue_types' || field.key === 'allowed_formats') {
-                   const baseNormalized = normalizeArrayValue(baseValue);
-                   const currentNormalized = normalizeArrayValue(currentValue);
-                   if (JSON.stringify(baseNormalized) === JSON.stringify(currentNormalized)) {
-                     return null;
-                   }
-                   return {
-                     key: field.key,
-                     label: field.label,
-                     baseValue: baseNormalized,
-                     currentValue: currentNormalized,
-                   };
-                 }
                  if (baseValue === currentValue) return null;
                  return {
                    key: field.key,
@@ -1104,7 +916,7 @@ export default function EditEventForm({
              }).filter(Boolean) as Array<{ id: number; title: string; date: string; diffs: Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }> }>;
 
              if (overrideEntries.length > 0) {
-               const riskyFields = new Set(['date', 'has_queue', 'queue_types']);
+               const riskyFields = new Set(['date']);
                const selections: Record<number, Record<string, boolean>> = {};
                overrideEntries.forEach((entry) => {
                  selections[entry.id] = entry.diffs.reduce((acc, diff) => {
@@ -1145,19 +957,6 @@ export default function EditEventForm({
                const diffs = OVERRIDE_FIELDS.map((field) => {
                  const baseValue = (payload as Record<string, unknown>)[field.key];
                  const currentValue = getEventFieldValue(event, field.key);
-                 if (field.key === 'queue_types' || field.key === 'allowed_formats') {
-                   const baseNormalized = normalizeArrayValue(baseValue);
-                   const currentNormalized = normalizeArrayValue(currentValue);
-                   if (JSON.stringify(baseNormalized) === JSON.stringify(currentNormalized)) {
-                     return null;
-                   }
-                   return {
-                     key: field.key,
-                     label: field.label,
-                     baseValue: baseNormalized,
-                     currentValue: currentNormalized,
-                   };
-                 }
                  if (baseValue === currentValue) return null;
                  return {
                    key: field.key,
@@ -1172,7 +971,7 @@ export default function EditEventForm({
              }).filter(Boolean) as Array<{ id: number; title: string; date: string; diffs: Array<{ key: string; label: string; baseValue: unknown; currentValue: unknown }> }>;
 
              if (overrideEntries.length > 0) {
-               const riskyFields = new Set(['date', 'has_queue', 'queue_types']);
+               const riskyFields = new Set(['date']);
                const selections: Record<number, Record<string, boolean>> = {};
                overrideEntries.forEach((entry) => {
                  selections[entry.id] = entry.diffs.reduce((acc, diff) => {
@@ -1232,16 +1031,9 @@ export default function EditEventForm({
           time: event.time,
           location: event.location,
           image_url: event.image_url || null,
-          venue_logo_url: event.venue_logo_url || null,
           info: event.info,
           info_url: event.info_url,
-          has_queue: event.has_queue,
-          queue_types: eventData.has_queue && normalizedQueueTypes.length > 0
-            ? normalizedQueueTypes
-            : null,
-          allowed_formats: normalizedFormats.length > 0 ? normalizedFormats : null,
           allowed_tags: allowedTags.length > 0 ? allowedTags : null,
-          crate_id: eventData.crate_id || null,
           parent_event_id: savedEvent.id,
           is_recurring: false,
           is_featured_grid: !!event.is_featured_grid,
@@ -1318,7 +1110,7 @@ export default function EditEventForm({
         <div>
           <h2 className="text-3xl font-bold">{editEventId ? 'Edit Event' : 'Create Event'}</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Build events with richer details, featured placement, and queue settings.
+            Build events with richer details and featured placement.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -1337,45 +1129,6 @@ export default function EditEventForm({
           ) : null}
         </div>
       </div>
-
-      {mode === 'page' ? (
-        <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-emerald-900">Add Game Sessions To This Event</h3>
-              <p className="text-xs text-emerald-800/90 mt-1">
-                Open a game setup page with this event pre-selected.
-              </p>
-            </div>
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-              <select
-                value={selectedGameSlug}
-                onChange={(e) => setSelectedGameSlug(e.target.value)}
-                className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm shadow-sm sm:w-64"
-              >
-                {EVENT_GAME_OPTIONS.map((game) => (
-                  <option key={game.slug} value={game.slug}>
-                    {game.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={handleOpenGameSetup}
-                disabled={!canOpenGameSetup}
-                className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Open Game Setup
-              </button>
-            </div>
-          </div>
-          <p className="mt-2 text-xs text-emerald-800/80">
-            {canOpenGameSetup
-              ? `Using event ID ${linkableEventId}. Opens in a new tab so this form stays intact.`
-              : 'Save this event first to unlock game setup links.'}
-          </p>
-        </section>
-      ) : null}
 
       {/* Series Editing Options */}
       {(isParentEvent || isPartOfSeries) && (
@@ -1635,7 +1388,7 @@ export default function EditEventForm({
           </div>
 
           <div className="space-y-6">
-            {(showEventImage || showVenueLogo) && (
+            {showEventImage && (
               <div className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Event media</h3>
                 <div className="grid gap-4 md:grid-cols-2">
@@ -1783,51 +1536,6 @@ export default function EditEventForm({
                       ) : null}
                     </div>
                   )}
-
-                  {showVenueLogo && (
-                    <div className="flex flex-col gap-3">
-                      <p className="text-sm font-semibold text-gray-700">Venue Logo (used on bingo non-game screens)</p>
-                      <div className="relative w-full aspect-[4/3] rounded-xl border border-dashed border-gray-300 bg-gray-50 overflow-hidden">
-                        {eventData.venue_logo_url ? (
-                          <Image
-                            src={eventData.venue_logo_url}
-                            alt="Venue logo"
-                            fill
-                            className="object-contain p-4"
-                            unoptimized
-                          />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
-                            Upload a venue logo
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowVenueLogoSelector(true)}
-                          className="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-                        >
-                          Choose or upload logo
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEventData((prev) => ({ ...prev, venue_logo_url: '' }))}
-                          className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                      <input
-                        name="venue_logo_url"
-                        value={eventData.venue_logo_url}
-                        onChange={handleChange}
-                        placeholder="Paste venue logo URL"
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
-                        disabled={!showVenueLogo}
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -1860,49 +1568,6 @@ export default function EditEventForm({
             </div>
           </div>
         </section>
-
-        {/* CRATE SELECTION (Replacing Tags) */}
-        {isFieldEnabled('crate') && (
-          <section className="p-5 border border-gray-200 rounded-2xl bg-gray-50/40">
-            <label className="block text-sm font-bold text-gray-700 mb-2">Limit Requests to Crate (Optional)</label>
-            <select 
-              name="crate_id" 
-              value={eventData.crate_id || ''} 
-              onChange={handleChange}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <option value="">-- Allow Entire Collection --</option>
-              {crates.map(crate => (
-                <option key={crate.id} value={crate.id}>
-                  {crate.icon} {crate.name}
-                </option>
-              ))}
-            </select>
-            <small className="block mt-2 text-gray-500 text-xs">
-              If selected, attendees can only see/request songs from this Crate.
-            </small>
-          </section>
-        )}
-
-        {/* ALLOWED FORMATS */}
-        {isFieldEnabled('formats') && (
-          <section className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
-            <label className="block text-sm font-bold text-gray-700 mb-2">Allowed Formats</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {formatList.map((format) => (
-                <label key={format} className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={eventData.allowed_formats.includes(format)}
-                    onChange={(e) => handleFormatChange(format, e.target.checked)}
-                    className="h-4 w-4"
-                  />
-                  {format}
-                </label>
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* RECURRING LOGIC */}
         {isFieldEnabled('recurrence') && eventData.date && eventData.date !== '9999-12-31' && !isPartOfSeries && (
@@ -1956,54 +1621,6 @@ export default function EditEventForm({
           </section>
         )}
         
-        {/* QUEUE LOGIC */}
-        {isFieldEnabled('queue') && (
-          <section className="p-5 bg-blue-50 border border-blue-200 rounded-2xl">
-          <label className="flex items-center gap-2 mb-4 font-bold text-blue-800">
-            <input
-              type="checkbox"
-              name="has_queue"
-              checked={eventData.has_queue}
-              onChange={handleCheckboxChange}
-              className="h-4 w-4"
-            />
-            Enable Request Queue
-          </label>
-
-          {eventData.has_queue && (
-            <div className="grid gap-3 md:grid-cols-3">
-              <label className="flex items-center gap-2 text-sm text-blue-900">
-                <input
-                  type="checkbox"
-                  checked={eventData.queue_types.includes('side')}
-                  onChange={(e) => handleQueueTypeChange('side', e.target.checked)}
-                  className="h-4 w-4"
-                />
-                📀 By Side (A/B)
-              </label>
-              <label className="flex items-center gap-2 text-sm text-blue-900">
-                <input
-                  type="checkbox"
-                  checked={eventData.queue_types.includes('track')}
-                  onChange={(e) => handleQueueTypeChange('track', e.target.checked)}
-                  className="h-4 w-4"
-                />
-                🎵 By Track
-              </label>
-              <label className="flex items-center gap-2 text-sm text-blue-900">
-                <input
-                  type="checkbox"
-                  checked={eventData.queue_types.includes('album')}
-                  onChange={(e) => handleQueueTypeChange('album', e.target.checked)}
-                  className="h-4 w-4"
-                />
-                💿 By Album
-              </label>
-            </div>
-          )}
-          </section>
-        )}
-
         <button
           type="submit"
           className="w-full rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white font-bold py-3 px-4 shadow-lg hover:from-blue-700 hover:to-indigo-800 transition-colors"
@@ -2022,20 +1639,6 @@ export default function EditEventForm({
           setEventData((prev) => ({
             ...prev,
             image_url: normalizeOptionalText(publicUrl),
-          }))
-        }
-      />
-
-      <AdminImageSelectorModal
-        isOpen={showVenueLogoSelector}
-        imageKind="venueLogo"
-        title="Select venue logo"
-        selectedUrl={eventData.venue_logo_url}
-        onClose={() => setShowVenueLogoSelector(false)}
-        onSelect={(publicUrl) =>
-          setEventData((prev) => ({
-            ...prev,
-            venue_logo_url: normalizeOptionalText(publicUrl),
           }))
         }
       />

@@ -1,5 +1,5 @@
 // Event Detail page ("/events/event-detail/[id]")
-// Shows event info, image, queue, and "browse the collection" link for this event.
+// Shows event info, image, and DJ sets for this event.
 
 "use client";
 
@@ -9,7 +9,6 @@ import { supabase } from 'src/lib/supabaseClient';
 import { formatEventText } from 'src/utils/textFormatter';
 import Image from 'next/image';
 import { Container } from 'components/ui/Container';
-import QueueSection from 'components/QueueSection';
 import EventDJSets from 'components/EventDJSets';
 import { useActiveTheme } from 'src/lib/useActiveTheme';
 
@@ -22,7 +21,6 @@ interface EventData {
   image_url?: string;
   info?: string;
   info_url?: string;
-  has_queue?: boolean;
   allowed_tags?: string[] | string | null;
 }
 
@@ -163,7 +161,6 @@ export default function Page() {
     image_url,
     info,
     info_url,
-    has_queue,
     allowed_tags
   } = event;
 
@@ -191,10 +188,6 @@ export default function Page() {
     ? image_url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace(/\?.*$/, '')
     : image_url || '/images/event-header-still.jpg';
   const squareFocus = getImageFocusFromTags(allowed_tags, IMAGE_FOCUS_SQUARE_TAG_PREFIX);
-
-  const goToBrowse = () => {
-    router.push(`/browse/browse-albums?eventId=${event.id}`);
-  };
 
   const navigateToEvent = (eventId: number | null) => {
     if (eventId) {
@@ -333,19 +326,6 @@ export default function Page() {
 
             {/* DJ Sets Section (left as-is — its own established styling) */}
             <EventDJSets eventId={event.id} />
-
-            {has_queue && (
-              <>
-                {/* Queue Section (left as-is — may double as a live venue-screen display) */}
-                <QueueSection eventId={String(event.id)} />
-                <button
-                  className="text-[var(--dwd-accent-1)] underline mt-4 inline-block font-medium text-base hover:text-[var(--dwd-accent-1-hover)] transition-colors"
-                  onClick={goToBrowse}
-                >
-                  Browse the Collection
-                </button>
-              </>
-            )}
           </section>
         </div>
       </Container>

@@ -141,7 +141,7 @@ export const DEFAULT_SECTIONS: {
     body: 'Vinyl Game Deck turns the night into a party — right alongside the set, no extra cover charge.',
     chips: ['Vinyl Bingo', 'Cover Art Clue Chase', 'Decade Dash'],
     cta_label: 'Explore Vinyl Game Deck →',
-    cta_href: '/games',
+    cta_href: 'https://vinylgamedeck.com',
     photo_placeholder_text: 'Photo coming soon — Vinyl Bingo on a brewery table',
   },
   dialogues_teaser: {

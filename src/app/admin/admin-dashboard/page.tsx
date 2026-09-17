@@ -208,7 +208,6 @@ export default function AdminDashboardPage() {
               {authStatus === 'authenticated' ? (
                 <>
                   <Link href="/admin/manage-events" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #10b981, #047857)' }}>📅 Manage Events</Link>
-                  <Link href="/edit-collection" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>📚 Collection Command Center</Link>
                   <Link href="/admin/diagnostics" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>🔍 Data Diagnostics</Link>
                 </>
               ) : (

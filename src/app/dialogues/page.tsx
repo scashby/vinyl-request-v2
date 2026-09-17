@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Container } from "components/ui/Container";
 import { useActiveTheme } from "src/lib/useActiveTheme";
+import { getSocialIcon } from "src/lib/socialIcons";
+import { DEFAULT_SECTIONS, type ConnectData, type HomepageSection } from "src/lib/homeContent";
 
 interface BlogPost {
   title: string;
@@ -15,14 +17,6 @@ interface BlogPost {
   content?: string;
   "content:encoded"?: string;
   categories?: string[];
-}
-
-interface Playlist {
-  id: number;
-  platform: string;
-  embed_html?: string;
-  embed_url?: string;
-  visible: boolean;
 }
 
 const CARD_TILT_VARS = ["--dwd-tilt-1", "--dwd-tilt-2", "--dwd-tilt-3", "--dwd-tilt-4"];
@@ -51,13 +45,17 @@ function Tags({ categories }: { categories?: string[] }) {
 export default function DialoguesPage() {
   const [featured, setFeatured] = useState<BlogPost | null>(null);
   const [articles, setArticles] = useState<BlogPost[]>([]);
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [connectData, setConnectData] = useState<ConnectData>(DEFAULT_SECTIONS.connect);
   const { cssVars } = useActiveTheme();
 
   useEffect(() => {
-    fetch("/api/playlists")
-      .then(res => res.json())
-      .then((data: Playlist[]) => setPlaylists(data ?? []));
+    fetch("/api/homepage-sections?page=home")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((rows: HomepageSection<Partial<ConnectData>>[]) => {
+        const connectRow = rows.find((r) => r.section_type === "connect");
+        if (connectRow) setConnectData({ ...DEFAULT_SECTIONS.connect, ...connectRow.data });
+      })
+      .catch((err) => console.error("Error loading social links:", err));
   }, []);
 
   useEffect(() => {
@@ -210,24 +208,27 @@ export default function DialoguesPage() {
           >
             <div>
               <div className="text-lg font-bold mb-4 border-b border-[var(--dwd-ink)]/10 pb-2">
-                Playlists
+                Follow Along
               </div>
-              <div className="space-y-6">
-                {playlists.map((p) => (
-                  <div key={p.id || p.platform}>
-                    <div className="text-sm font-bold text-[var(--dwd-accent-2)] mb-2 uppercase tracking-wide">
-                      {p.platform}
-                    </div>
-                    <div
-                      className="rounded-lg overflow-hidden shadow-sm"
-                      dangerouslySetInnerHTML={{
-                        __html: (p.embed_html || p.embed_url || '')
-                          .replace(/allowfullscreen="?"/g, '')
-                          .replace(/allowfullscreen/g, '')
-                      }}
-                    />
-                  </div>
-                ))}
+              <p className="text-sm text-[var(--dwd-ink-faint)] mb-4">
+                New posts, photos, and the playlist — wherever you already hang out.
+              </p>
+              <div className="flex flex-wrap gap-2.5">
+                {connectData.socials.map(({ name, url }) => {
+                  const Icon = getSocialIcon(name);
+                  return (
+                    <a
+                      key={name}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={name}
+                      className="w-10 h-10 rounded-full bg-[var(--dwd-ink)] text-[var(--dwd-bg)] flex items-center justify-center hover:-translate-y-0.5 hover:-rotate-[4deg] transition-transform"
+                    >
+                      <Icon size={17} />
+                    </a>
+                  );
+                })}
               </div>
             </div>
           </aside>

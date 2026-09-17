@@ -250,11 +250,8 @@ export default function EditHomePage() {
         <a href="/admin/manage-events" className="text-blue-600 hover:underline">
           Manage Events
         </a>
-        , Dialogues posts come from Substack, and the Spotify embed comes from{" "}
-        <a href="/admin/playlists" className="text-blue-600 hover:underline">
-          Playlists
-        </a>
-        .
+        , and Dialogues posts come from Substack. The Connect section&rsquo;s Spotify block always
+        links out to the Spotify URL set below.
       </p>
 
       <ThemeSwitcher />

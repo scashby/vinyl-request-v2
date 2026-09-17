@@ -3,6 +3,7 @@ import { Container } from 'components/ui/Container';
 import type { GameDeckData } from 'src/lib/homeContent';
 
 export function GameDeckSection({ data }: { data: GameDeckData }) {
+  const isExternal = /^https?:\/\//.test(data.cta_href);
   return (
     <Container size="xl">
       <div
@@ -28,12 +29,23 @@ export function GameDeckSection({ data }: { data: GameDeckData }) {
               </span>
             ))}
           </div>
-          <Link
-            href={data.cta_href}
-            className="inline-block px-6 py-3.5 bg-[var(--dwd-accent-1)] text-[var(--dwd-bg)] rounded-full font-bold text-sm hover:bg-[var(--dwd-accent-1-hover)] transition-colors"
-          >
-            {data.cta_label}
-          </Link>
+          {isExternal ? (
+            <a
+              href={data.cta_href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-6 py-3.5 bg-[var(--dwd-accent-1)] text-[var(--dwd-bg)] rounded-full font-bold text-sm hover:bg-[var(--dwd-accent-1-hover)] transition-colors"
+            >
+              {data.cta_label}
+            </a>
+          ) : (
+            <Link
+              href={data.cta_href}
+              className="inline-block px-6 py-3.5 bg-[var(--dwd-accent-1)] text-[var(--dwd-bg)] rounded-full font-bold text-sm hover:bg-[var(--dwd-accent-1-hover)] transition-colors"
+            >
+              {data.cta_label}
+            </Link>
+          )}
         </div>
         <div
           className="w-full sm:w-[280px] h-[180px] sm:h-[200px] flex-shrink-0 flex items-center justify-center text-center p-4 -rotate-[1.8deg] bg-[var(--dwd-bg)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]"

@@ -133,6 +133,49 @@ merging to `main`.
     and `localhost` isn't on the allowlist — same code, will work on the
     real domain.
 
+- **Collection and Games disconnected from the active admin/nav ("the
+  stuff we can't see").** Steve's call: Collection is abandoned entirely
+  for DWD, and Games are moving to the sister site Vinyl Game Deck
+  (vinylgamedeck.com) — both are kept *archival* (code left in place for
+  reference while building Vinyl Game Deck) but fully disconnected from
+  nav/routes/active admin:
+  - `EditEventForm.tsx`, `eventTypeConfig.ts`, `admin/event-types`,
+    `admin/manage-events`: removed every collection/games-dependent
+    field — `has_queue`, `queue_types`, `allowed_formats`, `crate_id`,
+    `venue_logo_url` (admin can no longer set it; DB column/per-event
+    usage tracking left alone), and the "Add Game Sessions" picker.
+    Manage Events' badge list and `validKeys` whitelist cleaned up to
+    match (also found and removed a pre-existing garbage duplicate-field
+    array unrelated to this task, `venue_logo_archived_archived_...`).
+  - `events/event-detail/[id]`: removed the `has_queue`-gated
+    `QueueSection` / "Browse the Collection" block from the public page.
+  - `AdminSidebar`: removed the Collection, Games, and Playlists nav
+    entries; `admin-dashboard`: removed the "Collection Command Center"
+    quick action.
+  - `NavigationMenu` "Games" and the homepage Game Deck teaser CTA now
+    link externally to `vinylgamedeck.com` instead of the internal
+    `/games` route (confirmed live). Updated in code, the live
+    `homepage_sections` DB row, and the seed SQL.
+  - `/admin/playlists` (the Spotify/Apple embed-code editor) is also
+    abandoned. Replacement: the homepage Connect section's Spotify block
+    now always shows its static fallback copy as a real link to the
+    Spotify profile URL (no more embed-or-fallback branching); the
+    Dialogues page sidebar's dynamic "Playlists" embed list was replaced
+    with a static "Follow Along" social-icon panel, sourced from the
+    same shared `connect.socials` data Footer already uses.
+  - The actual `/edit-collection/*`, `/browse/*`, and `/admin/games/*`
+    route trees were left completely untouched — only their nav entry
+    points were removed, per "archival, not deleted."
+  - Verified via a full production build (`npm run build && npm run
+    start`) plus scripted Playwright checks: public pages (external
+    link hrefs, no leftover queue/collection UI, no console errors
+    beyond the pre-existing localhost-only Maps 403), and a real admin
+    session (generated via the Supabase service-role
+    `admin/generate_link` technique) exercising Manage Events → Edit →
+    Save on a real event end-to-end, confirming the simplified form
+    still round-trips correctly without corrupting any of the
+    now-hidden DB fields.
+
 **📋 PLANNED / BACKLOG:**
 - Add a real photo of Steve (hero + Game Deck teaser currently show an
   honest "photo coming soon" placeholder — no fabricated image).
@@ -146,10 +189,12 @@ merging to `main`.
   section is its own row (`section_type`, `position`, `data jsonb`,
   `visible`), same shape a page-builder would use, so later reordering/
   show-hide/insert work is additive rather than a migration.
-- Events, Dialogues posts, and Spotify playlists stay sourced from their
-  existing tables/feeds (`events`, Substack via `/api/wordpress`, the
-  `playlists` table) — only the *static* homepage copy moves into the new
-  content model.
+- Events and Dialogues posts stay sourced from their existing tables/feeds
+  (`events`, Substack via `/api/wordpress`) — only the *static* homepage
+  copy moves into the new content model. The `playlists` table/API route
+  still exist (archival, per the Collection/Games note above) but are no
+  longer read by any active page; the Connect section's Spotify block and
+  the Dialogues sidebar now just link out to the static social URLs.
 - Admin write routes (`/api/homepage-sections/[id]`, `/api/site-theme`)
   follow this repo's existing convention of relying on the `/admin`
   client-side session gate rather than per-request server-side auth —

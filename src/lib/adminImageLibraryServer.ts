@@ -215,10 +215,11 @@ function collectEventTypeUsage(
   typeConfig: EventTypeConfig,
   subtypeConfig?: EventSubtypeConfig
 ) {
+  // Event type/subtype defaults only carry a default event image these days —
+  // venue logos are per-event only (handled in buildUsageMap via event.venue_logo_url).
+  if (imageKind !== "eventImage") return;
   const defaults = subtypeConfig?.defaults ?? typeConfig.defaults;
-  const publicUrl = normalizeUrl(
-    imageKind === "eventImage" ? defaults?.image_url : defaults?.venue_logo_url
-  );
+  const publicUrl = normalizeUrl(defaults?.image_url);
   if (!publicUrl) return;
 
   const baseLabel = typeConfig.label || typeConfig.id || "Untitled type";
