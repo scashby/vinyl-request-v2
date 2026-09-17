@@ -4,71 +4,12 @@ import Link from "next/link";
 import { existsSync } from "fs";
 import { join } from "path";
 import { Container } from "components/ui/Container";
-import {
-  gameBlueprints,
-  type GameBlueprint,
-  type GameStatus,
-} from "src/lib/gameBlueprints";
+import { gameBlueprints, type GameBlueprint } from "src/lib/gameBlueprints";
 import { publicCopyBySlug } from "src/lib/gamePublicCopy";
-import { supabaseAdmin } from "src/lib/supabaseAdmin";
+import { getActiveTheme, toCssVars } from "src/lib/getActiveThemeServer";
+import type { CSSProperties } from "react";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-type GameBlueprintOverride = {
-  title?: string;
-  status?: GameStatus;
-  notes?: string;
-  pullSizeGuidance?: string;
-};
-
-type GameEvent = {
-  id: number;
-  title: string;
-  date: string;
-  time: string | null;
-  location: string | null;
-};
-
-type DynamicEventIdQuery = {
-  from: (table: string) => {
-    select: (columns: string) => {
-      not: (column: string, operator: string, value: null) => {
-        limit: (count: number) => Promise<{
-          data: Array<{ event_id: number | null }> | null;
-          error: { message: string } | null;
-        }>;
-      };
-    };
-  };
-};
-
-const SESSION_TABLE_BY_SLUG: Partial<Record<string, string>> = {
-  bingo: "bingo_sessions",
-  "music-trivia": "trivia_sessions",
-  "name-that-tune": "ntt_sessions",
-  "bracket-battle": "bb_sessions",
-  "needle-drop-roulette": "ndr_sessions",
-  "lyric-gap-relay": "lgr_sessions",
-  "genre-imposter": "gi_sessions",
-  "decade-dash": "dd_sessions",
-  "cover-art-clue-chase": "cacc_sessions",
-  "crate-categories": "ccat_sessions",
-  "wrong-lyric-challenge": "wlc_sessions",
-  "sample-detective": "sd_sessions",
-  "artist-alias": "aa_sessions",
-  "original-or-cover": "ooc_sessions",
-  "back-to-back-connection": "b2bc_sessions",
-};
-
-const isGameStatus = (value: unknown): value is GameStatus =>
-  value === "in_production" ||
-  value === "in_development" ||
-  value === "needs_workshopping" ||
-  value === "undeveloped";
-
-const isTbaDate = (date: string | null | undefined): boolean =>
-  !date || date === "9999-12-31";
 
 function resolveLogoPath(slug: string): string | null {
   for (const ext of ["svg", "png", "jpg", "webp"]) {
@@ -86,93 +27,8 @@ function resolveLogoPath(slug: string): string | null {
   return null;
 }
 
-async function loadGame(slug: string): Promise<GameBlueprint | null> {
-  const blueprint = gameBlueprints.find((g) => g.slug === slug);
-  if (!blueprint) return null;
-
-  const { data: rows, error } = await supabaseAdmin
-    .from("admin_settings")
-    .select("key, value")
-    .eq("key", `game:blueprint:${slug}`)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Failed to load game blueprint override", error.message);
-    return blueprint;
-  }
-
-  if (!rows) return blueprint;
-
-  try {
-    const parsed = JSON.parse((rows.value as string) ?? "{}") as Record<
-      string,
-      unknown
-    >;
-    const override: GameBlueprintOverride = {
-      title:
-        typeof parsed.title === "string" && parsed.title.trim().length > 0
-          ? parsed.title.trim()
-          : undefined,
-      status: isGameStatus(parsed.status) ? parsed.status : undefined,
-      notes: typeof parsed.notes === "string" ? parsed.notes : undefined,
-      pullSizeGuidance:
-        typeof parsed.pullSizeGuidance === "string"
-          ? parsed.pullSizeGuidance
-          : undefined,
-    };
-    return { ...blueprint, ...override };
-  } catch {
-    return blueprint;
-  }
-}
-
-async function loadGameEvents(slug: string): Promise<GameEvent[]> {
-  const table = SESSION_TABLE_BY_SLUG[slug];
-  if (!table) return [];
-
-  const db = supabaseAdmin as unknown as DynamicEventIdQuery;
-  const { data, error } = await db
-    .from(table)
-    .select("event_id")
-    .not("event_id", "is", null)
-    .limit(10000);
-
-  if (error) {
-    console.error(`Failed to load events from ${table}`, error.message);
-    return [];
-  }
-
-  const eventIds = Array.from(
-    new Set(
-      ((data ?? []) as Array<{ event_id: number | null }>)
-        .filter((row) => Number.isFinite(row.event_id))
-        .map((row) => row.event_id as number)
-    )
-  );
-
-  if (eventIds.length === 0) return [];
-
-  const today = new Date().toISOString().split("T")[0];
-
-  const { data: events, error: eventsError } = await supabaseAdmin
-    .from("events")
-    .select("id, title, date, time, location")
-    .in("id", eventIds)
-    .or(`date.gte.${today},date.eq.9999-12-31`);
-
-  if (eventsError) {
-    console.error("Failed to load game events", eventsError.message);
-    return [];
-  }
-
-  return ((events ?? []) as GameEvent[]).sort((a, b) => {
-    const aIsTba = isTbaDate(a.date);
-    const bIsTba = isTbaDate(b.date);
-    if (aIsTba && !bIsTba) return 1;
-    if (!aIsTba && bIsTba) return -1;
-    if (aIsTba && bIsTba) return a.title.localeCompare(b.title);
-    return (a.date ?? "").localeCompare(b.date ?? "");
-  });
+function loadGame(slug: string): GameBlueprint | null {
+  return gameBlueprints.find((g) => g.slug === slug) ?? null;
 }
 
 export async function generateMetadata({
@@ -181,7 +37,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const game = await loadGame(slug);
+  const game = loadGame(slug);
   if (!game) return { title: "Game Not Found" };
   const copy = publicCopyBySlug[slug];
   return {
@@ -196,7 +52,7 @@ export default async function GamePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const game = await loadGame(slug);
+  const game = loadGame(slug);
 
   if (
     !game ||
@@ -207,26 +63,29 @@ export default async function GamePage({
 
   const publicCopy = publicCopyBySlug[slug];
   const logoPath = resolveLogoPath(slug);
-  const events = await loadGameEvents(slug);
   const isProduction = game.status === "in_production";
+  const theme = await getActiveTheme();
+  const cssVars = toCssVars(theme) as CSSProperties;
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div
+      className="min-h-screen font-[family-name:var(--dwd-font-body)] bg-[var(--dwd-bg)] text-[var(--dwd-ink)]"
+      style={cssVars}
+    >
       {/* Header */}
-      <header className="relative w-full pt-16 pb-12 bg-zinc-950 border-b border-white/10">
+      <header className="relative w-full pt-16 pb-12 border-b border-[var(--dwd-ink)]/10">
         <Container size="xl">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
             {/* Logo */}
-            <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-black/60 ring-1 ring-white/15 overflow-hidden shrink-0">
+            <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-[var(--dwd-bg-card)] overflow-hidden shrink-0 [border:var(--dwd-card-border)]">
               {logoPath ? (
-                 
                 <Image unoptimized width={1200} height={1200}
                   src={logoPath}
                   alt={`${game.title} logo`}
                   className="w-14 h-14 object-contain"
                 />
               ) : (
-                <span className="text-3xl font-bold text-zinc-500 select-none">
+                <span className="text-3xl font-bold text-[var(--dwd-ink-faint)] select-none">
                   {game.title.charAt(0)}
                 </span>
               )}
@@ -236,25 +95,26 @@ export default async function GamePage({
               <div className="flex items-center gap-3 flex-wrap mb-2">
                 <Link
                   href="/games"
-                  className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors font-medium"
+                  className="text-xs text-[var(--dwd-ink-faint)] hover:text-[var(--dwd-ink)] transition-colors font-medium"
                 >
-                  ← Games
+                  &larr; Games
                 </Link>
                 <span
-                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${
+                  className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold"
+                  style={
                     isProduction
-                      ? "bg-[#00c4ff]/15 text-[#b8efff] ring-[#00c4ff]/35"
-                      : "bg-emerald-500/15 text-emerald-200 ring-emerald-400/30"
-                  }`}
+                      ? { background: 'color-mix(in srgb, var(--dwd-accent-2) 18%, transparent)', color: 'var(--dwd-accent-2)' }
+                      : { background: 'color-mix(in srgb, var(--dwd-accent-3) 25%, transparent)', color: 'var(--dwd-ink)' }
+                  }
                 >
                   {isProduction ? "Live" : "In development"}
                 </span>
               </div>
-              <h1 className="font-serif-display text-3xl md:text-5xl font-bold tracking-tight">
+              <h1 className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-3xl md:text-5xl">
                 {game.title}
               </h1>
               {publicCopy?.tagline ? (
-                <p className="mt-2 text-zinc-300/80 text-base md:text-lg leading-relaxed max-w-2xl">
+                <p className="mt-2 text-[var(--dwd-ink-soft)] text-base md:text-lg leading-relaxed max-w-2xl">
                   {publicCopy.tagline}
                 </p>
               ) : null}
@@ -263,7 +123,7 @@ export default async function GamePage({
             <div className="sm:shrink-0">
               <Link
                 href="/about"
-                className="inline-flex items-center px-5 py-2.5 rounded-full bg-[#00c4ff]/15 hover:bg-[#00c4ff]/20 transition-colors ring-1 ring-[#00c4ff]/30 text-sm font-semibold text-[#b8efff]"
+                className="inline-flex items-center px-5 py-2.5 rounded-full bg-[var(--dwd-accent-1)] text-[var(--dwd-bg)] hover:bg-[var(--dwd-accent-1-hover)] transition-colors text-sm font-semibold"
               >
                 Book this game
               </Link>
@@ -277,26 +137,26 @@ export default async function GamePage({
           {!isProduction ? (
             /* In-development: show teaser content */
             <div className="max-w-2xl">
-              <div className="rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-6 mb-8">
-                <div className="text-xs uppercase tracking-[0.18em] text-zinc-400 mb-3">
+              <div className="rounded-2xl bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] p-6 mb-8">
+                <div className="text-xs uppercase tracking-[0.18em] text-[var(--dwd-ink-faint)] mb-3">
                   What it is
                 </div>
-                <p className="text-zinc-200/90 leading-relaxed">
+                <p className="text-[var(--dwd-ink-soft)] leading-relaxed">
                   {publicCopy?.playerExperience ?? game.coreMechanic}
                 </p>
                 {game.notes ? (
-                  <p className="mt-4 text-sm text-zinc-400 leading-relaxed">
+                  <p className="mt-4 text-sm text-[var(--dwd-ink-faint)] leading-relaxed">
                     {game.notes}
                   </p>
                 ) : null}
               </div>
 
               {publicCopy?.whatYouDo?.length ? (
-                <div className="rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-6 mb-8">
-                  <div className="text-xs uppercase tracking-[0.18em] text-zinc-400 mb-3">
+                <div className="rounded-2xl bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] p-6 mb-8">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[var(--dwd-ink-faint)] mb-3">
                     How it works
                   </div>
-                  <ul className="space-y-2 text-zinc-200/90 text-sm leading-relaxed list-disc list-inside">
+                  <ul className="space-y-2 text-[var(--dwd-ink-soft)] text-sm leading-relaxed list-disc list-inside">
                     {publicCopy.whatYouDo.map((step) => (
                       <li key={step}>{step}</li>
                     ))}
@@ -304,19 +164,19 @@ export default async function GamePage({
                 </div>
               ) : null}
 
-              <div className="rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-6">
-                <div className="text-xs uppercase tracking-[0.18em] text-zinc-400 mb-3">
+              <div className="rounded-2xl bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] p-6">
+                <div className="text-xs uppercase tracking-[0.18em] text-[var(--dwd-ink-faint)] mb-3">
                   Stay in the loop
                 </div>
-                <p className="text-zinc-300/80 text-sm leading-relaxed mb-4">
+                <p className="text-[var(--dwd-ink-soft)] text-sm leading-relaxed mb-4">
                   {game.title} is being refined for live play. Get in touch to
                   be the first venue to book it.
                 </p>
                 <Link
                   href="/about"
-                  className="inline-flex items-center px-4 py-2 rounded-full bg-[#00c4ff]/15 hover:bg-[#00c4ff]/20 transition-colors ring-1 ring-[#00c4ff]/30 text-sm font-semibold text-[#b8efff]"
+                  className="inline-flex items-center px-4 py-2 rounded-full bg-[var(--dwd-accent-1)] text-[var(--dwd-bg)] hover:bg-[var(--dwd-accent-1-hover)] transition-colors text-sm font-semibold"
                 >
-                  Enquire →
+                  Enquire &rarr;
                 </Link>
               </div>
             </div>
@@ -327,11 +187,11 @@ export default async function GamePage({
               <div className="lg:col-span-2 space-y-6">
                 {/* Player experience */}
                 {publicCopy?.playerExperience ? (
-                  <section className="rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-6">
-                    <div className="text-xs uppercase tracking-[0.18em] text-zinc-400 mb-3">
+                  <section className="rounded-2xl bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] p-6">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[var(--dwd-ink-faint)] mb-3">
                       What it feels like
                     </div>
-                    <p className="text-zinc-200/90 leading-relaxed">
+                    <p className="text-[var(--dwd-ink-soft)] leading-relaxed">
                       {publicCopy.playerExperience}
                     </p>
                   </section>
@@ -339,17 +199,17 @@ export default async function GamePage({
 
                 {/* How to play */}
                 {publicCopy?.whatYouDo?.length ? (
-                  <section className="rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-6">
-                    <div className="text-xs uppercase tracking-[0.18em] text-zinc-400 mb-4">
+                  <section className="rounded-2xl bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] p-6">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[var(--dwd-ink-faint)] mb-4">
                       How to play
                     </div>
                     <ol className="space-y-3">
                       {publicCopy.whatYouDo.map((step, i) => (
                         <li key={step} className="flex gap-3 text-sm leading-relaxed">
-                          <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-[#00c4ff]/15 text-[#b8efff] text-xs font-bold ring-1 ring-[#00c4ff]/30 mt-0.5">
+                          <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold mt-0.5" style={{ background: 'color-mix(in srgb, var(--dwd-accent-1) 18%, transparent)', color: 'var(--dwd-accent-1)' }}>
                             {i + 1}
                           </span>
-                          <span className="text-zinc-200/90">{step}</span>
+                          <span className="text-[var(--dwd-ink-soft)]">{step}</span>
                         </li>
                       ))}
                     </ol>
@@ -358,17 +218,17 @@ export default async function GamePage({
 
                 {/* Example round */}
                 {publicCopy?.exampleRound?.length ? (
-                  <section className="rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-6">
-                    <div className="text-xs uppercase tracking-[0.18em] text-zinc-400 mb-4">
+                  <section className="rounded-2xl bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] p-6">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[var(--dwd-ink-faint)] mb-4">
                       Example round
                     </div>
                     <ol className="space-y-3">
                       {publicCopy.exampleRound.map((step, i) => (
                         <li key={step} className="flex gap-3 text-sm leading-relaxed">
-                          <span className="shrink-0 text-zinc-600 font-mono text-xs mt-1">
+                          <span className="shrink-0 text-[var(--dwd-ink-faint)] font-mono text-xs mt-1">
                             {String(i + 1).padStart(2, "0")}
                           </span>
-                          <span className="text-zinc-300/85">{step}</span>
+                          <span className="text-[var(--dwd-ink-soft)]">{step}</span>
                         </li>
                       ))}
                     </ol>
@@ -379,53 +239,53 @@ export default async function GamePage({
               {/* Sidebar */}
               <div className="space-y-5">
                 {/* Booker details */}
-                <section className="rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-5">
-                  <div className="text-xs uppercase tracking-[0.18em] text-zinc-400 mb-4">
+                <section className="rounded-2xl bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] p-5">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[var(--dwd-ink-faint)] mb-4">
                     Booker details
                   </div>
                   <dl className="space-y-3 text-sm">
                     {publicCopy?.howYouWin ? (
                       <div>
-                        <dt className="font-semibold text-zinc-200">How you win</dt>
-                        <dd className="mt-1 text-zinc-300/80 leading-relaxed">
+                        <dt className="font-semibold text-[var(--dwd-ink)]">How you win</dt>
+                        <dd className="mt-1 text-[var(--dwd-ink-soft)] leading-relaxed">
                           {publicCopy.howYouWin}
                         </dd>
                       </div>
                     ) : null}
                     {(publicCopy?.scoring ?? game.scoring) ? (
                       <div>
-                        <dt className="font-semibold text-zinc-200">Scoring</dt>
-                        <dd className="mt-1 text-zinc-300/80 leading-relaxed">
+                        <dt className="font-semibold text-[var(--dwd-ink)]">Scoring</dt>
+                        <dd className="mt-1 text-[var(--dwd-ink-soft)] leading-relaxed">
                           {publicCopy?.scoring ?? game.scoring}
                         </dd>
                       </div>
                     ) : null}
                     {publicCopy?.bestFor ? (
                       <div>
-                        <dt className="font-semibold text-zinc-200">Best for</dt>
-                        <dd className="mt-1 text-zinc-300/80 leading-relaxed">
+                        <dt className="font-semibold text-[var(--dwd-ink)]">Best for</dt>
+                        <dd className="mt-1 text-[var(--dwd-ink-soft)] leading-relaxed">
                           {publicCopy.bestFor}
                         </dd>
                       </div>
                     ) : null}
                     {publicCopy?.whatYouNeed ? (
                       <div>
-                        <dt className="font-semibold text-zinc-200">What we bring / need</dt>
-                        <dd className="mt-1 text-zinc-300/80 leading-relaxed">
+                        <dt className="font-semibold text-[var(--dwd-ink)]">What we bring / need</dt>
+                        <dd className="mt-1 text-[var(--dwd-ink-soft)] leading-relaxed">
                           {publicCopy.whatYouNeed}
                         </dd>
                       </div>
                     ) : null}
                     <div>
-                      <dt className="font-semibold text-zinc-200">Why it works</dt>
-                      <dd className="mt-1 text-zinc-300/80 leading-relaxed">
+                      <dt className="font-semibold text-[var(--dwd-ink)]">Why it works</dt>
+                      <dd className="mt-1 text-[var(--dwd-ink-soft)] leading-relaxed">
                         {game.whyItWorks}
                       </dd>
                     </div>
                     {game.notes ? (
                       <div>
-                        <dt className="font-semibold text-zinc-200">Note</dt>
-                        <dd className="mt-1 text-zinc-400 leading-relaxed">
+                        <dt className="font-semibold text-[var(--dwd-ink)]">Note</dt>
+                        <dd className="mt-1 text-[var(--dwd-ink-faint)] leading-relaxed">
                           {game.notes}
                         </dd>
                       </div>
@@ -434,83 +294,23 @@ export default async function GamePage({
                 </section>
 
                 {/* Book CTA */}
-                <section className="rounded-2xl bg-[#00c4ff]/10 ring-1 ring-[#00c4ff]/25 p-5">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#b8efff]/70 mb-2">
+                <section className="rounded-2xl p-5" style={{ background: 'color-mix(in srgb, var(--dwd-accent-1) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--dwd-accent-1) 25%, transparent)' }}>
+                  <div className="text-xs uppercase tracking-[0.18em] mb-2" style={{ color: 'var(--dwd-accent-1)' }}>
                     Ready to book?
                   </div>
-                  <p className="text-sm text-zinc-300/80 leading-relaxed mb-4">
+                  <p className="text-sm text-[var(--dwd-ink-soft)] leading-relaxed mb-4">
                     Bring {game.title} to your venue. Get in touch and
                     we&apos;ll sort out the details.
                   </p>
                   <Link
                     href="/about"
-                    className="inline-flex items-center px-4 py-2 rounded-full bg-[#00c4ff]/20 hover:bg-[#00c4ff]/30 transition-colors ring-1 ring-[#00c4ff]/40 text-sm font-semibold text-[#b8efff]"
+                    className="inline-flex items-center px-4 py-2 rounded-full bg-[var(--dwd-accent-1)] text-[var(--dwd-bg)] hover:bg-[var(--dwd-accent-1-hover)] transition-colors text-sm font-semibold"
                   >
-                    Book this game →
+                    Book this game &rarr;
                   </Link>
                 </section>
               </div>
             </div>
-          )}
-
-          {/* Upcoming events for this game */}
-          {events.length > 0 ? (
-            <section className="mt-14">
-              <div className="flex items-end justify-between gap-6 flex-wrap mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold tracking-tight">
-                    Upcoming {game.title} nights
-                  </h2>
-                  <p className="mt-1 text-zinc-400 text-sm">
-                    Events where {game.title} is on the programme.
-                  </p>
-                </div>
-                <Link
-                  href="/events/events-page"
-                  className="text-sm text-[#b8efff] hover:text-white transition-colors font-medium"
-                >
-                  All events →
-                </Link>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {events.map((event) => (
-                  <Link
-                    key={event.id}
-                    href={`/events/event-detail/${event.id}`}
-                    className="group rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-5 hover:ring-[#00c4ff]/30 transition-colors flex flex-col gap-2"
-                  >
-                    <p className="text-xs uppercase tracking-[0.18em] text-zinc-400">
-                      {isTbaDate(event.date)
-                        ? "Date TBA"
-                        : new Date(
-                            `${event.date}T00:00:00`
-                          ).toLocaleDateString("en-US", {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
-                      {event.time ? ` · ${event.time}` : null}
-                    </p>
-                    <h3 className="text-lg font-bold tracking-tight leading-snug group-hover:text-[#b8efff] transition-colors">
-                      {event.title}
-                    </h3>
-                    {event.location ? (
-                      <p className="text-sm text-zinc-400">{event.location}</p>
-                    ) : null}
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ) : (
-            <section className="mt-14">
-              <div className="rounded-2xl bg-zinc-950/70 ring-1 ring-white/10 p-8 text-center">
-                <p className="text-zinc-300">
-                  Follow us on Instagram, Facebook, and other socials @deadwaxdialogues.
-                </p>
-              </div>
-            </section>
           )}
         </Container>
       </main>
