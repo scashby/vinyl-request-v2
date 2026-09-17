@@ -24,10 +24,13 @@ export default function NavigationMenu() {
 
   // "Browse Collection" and the personal-collector nav items were dropped —
   // that's About-page (wishlist/Most Wanted) content now, not primary nav.
+  // "Games" stays internal — it's DWD's own live catalog of games Steve runs
+  // at his events, not the same thing as the sister site Vinyl Game Deck
+  // (that's only linked from the homepage's Game Deck teaser section).
   const navLinks = [
     { name: 'About', path: '/about' },
     { name: 'Events', path: '/events/events-page' },
-    { name: 'Games', path: 'https://vinylgamedeck.com', isExternal: true },
+    { name: 'Games', path: '/games' },
     { name: 'DJ Sets', path: '/dj-sets' },
     { name: 'Dialogues', path: '/dialogues' },
     { name: 'Merch', path: '/merch' },
@@ -60,19 +63,6 @@ export default function NavigationMenu() {
           <div className="hidden md:flex items-center gap-8">
             {navLinks.map((item) => {
               const isActive = pathname === item.path;
-              if (item.isExternal) {
-                return (
-                  <a
-                    key={item.path}
-                    href={item.path}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="relative text-sm font-bold uppercase tracking-wider transition-colors duration-200 text-[var(--dwd-ink)]/70 hover:text-[var(--dwd-ink)]"
-                  >
-                    {item.name}
-                  </a>
-                );
-              }
               return (
                 <Link
                   key={item.path}
@@ -116,31 +106,18 @@ export default function NavigationMenu() {
         >
             Home
         </Link>
-        {navLinks.map((item) =>
-          item.isExternal ? (
-            <a
-              key={item.path}
-              href={item.path}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="text-2xl font-bold uppercase tracking-widest text-[var(--dwd-ink)]/70 hover:text-[var(--dwd-ink)]"
-            >
-              {item.name}
-            </a>
-          ) : (
-            <Link
-              key={item.path}
-              href={item.path}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={`text-2xl font-bold uppercase tracking-widest ${
-                pathname === item.path ? 'text-[var(--dwd-accent-2)]' : 'text-[var(--dwd-ink)]/70 hover:text-[var(--dwd-ink)]'
-              }`}
-            >
-              {item.name}
-            </Link>
-          )
-        )}
+        {navLinks.map((item) => (
+          <Link
+            key={item.path}
+            href={item.path}
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`text-2xl font-bold uppercase tracking-widest ${
+              pathname === item.path ? 'text-[var(--dwd-accent-2)]' : 'text-[var(--dwd-ink)]/70 hover:text-[var(--dwd-ink)]'
+            }`}
+          >
+            {item.name}
+          </Link>
+        ))}
       </div>
     </div>
   );
