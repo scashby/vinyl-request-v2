@@ -7,11 +7,10 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from 'src/lib/supabaseClient';
 import { formatEventText } from 'src/utils/textFormatter';
-import Image from 'next/image';
 import { Container } from 'components/ui/Container';
 import EventDJSets from 'components/EventDJSets';
 import { useActiveTheme } from 'src/lib/useActiveTheme';
-import { getImageFocusFromTags, imageFocusStyle, IMAGE_FOCUS_SQUARE_TAG_PREFIX } from 'src/lib/imageFocus';
+import { cropRectImageStyle, getImageCropFromTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX } from 'src/lib/imageCrop';
 
 interface EventData {
   id: number;
@@ -180,7 +179,7 @@ export default function Page() {
     : image_url
       ? fixDropboxUrl(image_url)
       : '/images/event-header-still.jpg';
-  const squareFocus = getImageFocusFromTags(allowed_tags, IMAGE_FOCUS_SQUARE_TAG_PREFIX);
+  const squareCrop = getImageCropFromTags(allowed_tags, IMAGE_FOCUS_SQUARE_TAG_PREFIX);
 
   const navigateToEvent = (eventId: number | null) => {
     if (eventId) {
@@ -224,14 +223,8 @@ export default function Page() {
               className="text-center overflow-hidden bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)] -rotate-[0.6deg]"
             >
               <div className="relative aspect-square w-full">
-                <Image
-                  src={imageSrc}
-                  alt={displayTitle}
-                  fill
-                  className="object-cover"
-                  style={imageFocusStyle(squareFocus)}
-                  unoptimized
-                />
+                {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
+                <img src={imageSrc} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
               </div>
               <div className="p-6">
                 <h2 className="text-2xl font-bold mb-2">{displayTitle}</h2>

@@ -2,17 +2,16 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { supabase } from "src/lib/supabaseClient";
 import { formatEventText } from "src/utils/textFormatter";
 import { Container } from "components/ui/Container";
 import { useActiveTheme } from "src/lib/useActiveTheme";
 import {
-  getImageFocusFromTags,
-  imageFocusStyle,
+  cropRectImageStyle,
+  getImageCropFromTags,
   IMAGE_FOCUS_COVER_TAG_PREFIX,
   IMAGE_FOCUS_SQUARE_TAG_PREFIX,
-} from "src/lib/imageFocus";
+} from "src/lib/imageCrop";
 
 interface Event {
   id: number;
@@ -263,7 +262,7 @@ export default function Page() {
                         ev.date === "" ||
                         ev.date === "9999-12-31";
                       const displayTitle = getDisplayTitle(ev);
-                      const coverFocus = getImageFocusFromTags(
+                      const coverCrop = getImageCropFromTags(
                         ev.allowed_tags,
                         IMAGE_FOCUS_COVER_TAG_PREFIX
                       );
@@ -279,15 +278,8 @@ export default function Page() {
                             style={{ transform: `rotate(var(${CARD_TILT_VARS[i % CARD_TILT_VARS.length]}))` }}
                           >
                             <div className="relative w-full aspect-video">
-                              <Image
-                                src={img}
-                                alt={displayTitle}
-                                fill
-                                sizes="(max-width:900px) 100vw, 700px"
-                                className="object-cover"
-                                style={imageFocusStyle(coverFocus)}
-                                unoptimized
-                              />
+                              {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
+                              <img src={img} alt={displayTitle} style={cropRectImageStyle(coverCrop)} />
                             </div>
                             <div className="p-6 pb-7">
                               <div
@@ -327,7 +319,7 @@ export default function Page() {
                       const d = compactDate(e.date);
                       const tba = !e.date || e.date === "" || e.date === "9999-12-31";
                       const displayTitle = getDisplayTitle(e);
-                      const squareFocus = getImageFocusFromTags(
+                      const squareCrop = getImageCropFromTags(
                         e.allowed_tags,
                         IMAGE_FOCUS_SQUARE_TAG_PREFIX
                       );
@@ -340,15 +332,8 @@ export default function Page() {
                         >
                           <div className="overflow-hidden flex flex-col transition-all duration-200 group-hover:-translate-y-1 bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] rounded-lg">
                             <div className="relative w-full pt-[100%]">
-                              <Image
-                                src={img}
-                                alt={displayTitle}
-                                fill
-                                sizes="280px"
-                                className="object-cover"
-                                style={imageFocusStyle(squareFocus)}
-                                unoptimized
-                              />
+                              {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
+                              <img src={img} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
                             </div>
                             <div className="p-4">
                               <h4
@@ -380,7 +365,7 @@ export default function Page() {
                       const img =
                         e.image_url_square || e.image_url || "/images/coverplaceholder.png";
                       const displayTitle = getDisplayTitle(e);
-                      const squareFocus = getImageFocusFromTags(
+                      const squareCrop = getImageCropFromTags(
                         e.allowed_tags,
                         IMAGE_FOCUS_SQUARE_TAG_PREFIX
                       );
@@ -395,15 +380,8 @@ export default function Page() {
                             <DateBox date={e.date} />
 
                             <div className="relative w-full h-[150px] rounded-md overflow-hidden hidden md:block">
-                              <Image
-                                src={img}
-                                alt={displayTitle}
-                                fill
-                                sizes="150px"
-                                className="object-cover"
-                                style={imageFocusStyle(squareFocus)}
-                                unoptimized
-                              />
+                              {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
+                              <img src={img} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
                             </div>
 
                             <div className="min-w-0 col-span-1 md:col-span-1">

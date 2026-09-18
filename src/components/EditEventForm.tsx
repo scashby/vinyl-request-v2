@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import AdminImageSelectorModal from 'src/components/admin/AdminImageSelectorModal';
-import ImageFocalPointPicker from 'src/components/admin/ImageFocalPointPicker';
+import EventImageCropper from 'src/components/admin/EventImageCropper';
 import { supabase } from 'src/lib/supabaseClient';
 import type { Database } from 'types/supabase';
 import {
@@ -17,14 +17,13 @@ import {
   mergeEventTypeConfig,
 } from 'src/lib/eventTypeConfig';
 import {
-  buildImageFocusTag,
-  DEFAULT_IMAGE_FOCUS,
+  buildImageCropTag,
+  DEFAULT_IMAGE_CROP,
   IMAGE_FOCUS_COVER_TAG_PREFIX,
   IMAGE_FOCUS_SQUARE_TAG_PREFIX,
-  imageFocusStyle,
-  parseImageFocusTag,
-  type ImageFocusPoint,
-} from 'src/lib/imageFocus';
+  parseImageCropTag,
+  type ImageCropRect,
+} from 'src/lib/imageCrop';
 
 const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
 
@@ -295,8 +294,8 @@ export default function EditEventForm({
   const [isRegeneratingChildren, setIsRegeneratingChildren] = useState(false);
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [showSquareImageSelector, setShowSquareImageSelector] = useState(false);
-  const [imageFocusCover, setImageFocusCover] = useState<ImageFocusPoint>(DEFAULT_IMAGE_FOCUS);
-  const [imageFocusSquare, setImageFocusSquare] = useState<ImageFocusPoint>(DEFAULT_IMAGE_FOCUS);
+  const [imageCropCover, setImageCropCover] = useState<ImageCropRect>(DEFAULT_IMAGE_CROP);
+  const [imageCropSquare, setImageCropSquare] = useState<ImageCropRect>(DEFAULT_IMAGE_CROP);
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
     normalizeEventTypeConfig(defaultEventTypeConfig)
   );
@@ -516,8 +515,8 @@ export default function EditEventForm({
           info_url: copiedEvent?.info_url ?? '',
           is_recurring: false
         }));
-        setImageFocusCover(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
-        setImageFocusSquare(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
+        setImageCropCover(parseImageCropTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
+        setImageCropSquare(parseImageCropTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
       } else if (editEventId) {
         const { data, error } = await supabase
           .from('events')
@@ -555,8 +554,8 @@ export default function EditEventForm({
             is_featured_upnext: !!dbEvent.is_featured_upnext,
             featured_priority: dbEvent.featured_priority ?? null,
           });
-          setImageFocusCover(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
-          setImageFocusSquare(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
+          setImageCropCover(parseImageCropTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
+          setImageCropSquare(parseImageCropTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
           
           setSeriesParentId(parentId);
           setSelectedSeriesEventId(dbEvent.id);
@@ -667,8 +666,8 @@ export default function EditEventForm({
         is_featured_upnext: !!dbEvent.is_featured_upnext,
         featured_priority: dbEvent.featured_priority ?? null,
       }));
-      setImageFocusCover(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
-      setImageFocusSquare(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
+      setImageCropCover(parseImageCropTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
+      setImageCropSquare(parseImageCropTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
     }
   };
 
@@ -848,8 +847,8 @@ export default function EditEventForm({
       const allowedTags = [
         buildTag(EVENT_TYPE_TAG_PREFIX, eventData.event_type),
         buildTag(EVENT_SUBTYPE_TAG_PREFIX, eventData.event_subtype),
-        buildImageFocusTag(IMAGE_FOCUS_COVER_TAG_PREFIX, imageFocusCover),
-        buildImageFocusTag(IMAGE_FOCUS_SQUARE_TAG_PREFIX, imageFocusSquare),
+        buildImageCropTag(IMAGE_FOCUS_COVER_TAG_PREFIX, imageCropCover),
+        buildImageCropTag(IMAGE_FOCUS_SQUARE_TAG_PREFIX, imageCropSquare),
       ].filter(Boolean) as string[];
       const normalizedImageUrl = normalizeOptionalText(eventData.image_url);
       const normalizedImageUrlSquare = normalizeOptionalText(eventData.image_url_square);
@@ -1401,7 +1400,6 @@ export default function EditEventForm({
                           alt="Event"
                           fill
                           className="object-cover"
-                          style={imageFocusStyle(imageFocusCover)}
                           unoptimized
                         />
                       ) : (
@@ -1484,21 +1482,23 @@ export default function EditEventForm({
                 {eventData.image_url ? (
                   <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
-                      Crop / focal point
+                      Crop
                     </p>
                     <div className="grid gap-4 md:grid-cols-2">
-                      <ImageFocalPointPicker
+                      <EventImageCropper
                         imageUrl={eventData.image_url}
-                        value={imageFocusCover}
-                        onChange={setImageFocusCover}
+                        value={imageCropCover}
+                        onChange={setImageCropCover}
+                        aspect={16 / 9}
                         aspectClassName="aspect-video"
                         label="Cover / widescreen (16:9)"
                         usedOn="the Up Next card on the events page"
                       />
-                      <ImageFocalPointPicker
+                      <EventImageCropper
                         imageUrl={eventData.image_url_square || eventData.image_url}
-                        value={imageFocusSquare}
-                        onChange={setImageFocusSquare}
+                        value={imageCropSquare}
+                        onChange={setImageCropSquare}
+                        aspect={1}
                         aspectClassName="aspect-square"
                         label={
                           eventData.image_url_square
