@@ -14,6 +14,7 @@ interface Event {
   date: string;
   location?: string;
   image_url?: string;
+  image_url_square?: string;
   is_featured_grid?: boolean;
   featured_priority?: number | string | null;
   allowed_tags?: string[] | string | null;
@@ -335,7 +336,7 @@ export default function Page() {
                   <SectionTitle text="Featured" />
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                     {featuredGrid.map((e) => {
-                      const img = e.image_url || "/images/coverplaceholder.png";
+                      const img = e.image_url_square || e.image_url || "/images/coverplaceholder.png";
                       const d = compactDate(e.date);
                       const tba = !e.date || e.date === "" || e.date === "9999-12-31";
                       const displayTitle = getDisplayTitle(e);
@@ -390,7 +391,7 @@ export default function Page() {
                   <div className="space-y-4">
                     {events.map((e) => {
                       const img =
-                        e.image_url || "/images/coverplaceholder.png";
+                        e.image_url_square || e.image_url || "/images/coverplaceholder.png";
                       const displayTitle = getDisplayTitle(e);
                       const squareFocus = getImageFocusFromTags(
                         e.allowed_tags,

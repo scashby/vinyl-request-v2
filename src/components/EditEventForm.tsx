@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import AdminImageSelectorModal from 'src/components/admin/AdminImageSelectorModal';
+import ImageFocalPointPicker from 'src/components/admin/ImageFocalPointPicker';
 import { supabase } from 'src/lib/supabaseClient';
 import type { Database } from 'types/supabase';
 import {
@@ -91,6 +92,7 @@ interface EventData {
   time: string;
   location: string;
   image_url: string;
+  image_url_square: string;
   info: string;
   info_url: string;
 
@@ -235,6 +237,7 @@ function buildEventDataFromDbEvent(dbEvent: DbEvent): EventData {
     time: dbEvent.time ?? '',
     location: dbEvent.location ?? '',
     image_url: dbEvent.image_url ?? '',
+    image_url_square: dbEvent.image_url_square ?? '',
     info: dbEvent.info ?? '',
     info_url: dbEvent.info_url ?? '',
     is_recurring: !!dbEvent.is_recurring,
@@ -257,6 +260,7 @@ const OVERRIDE_FIELDS: Array<{
   { key: 'time', label: 'Time' },
   { key: 'location', label: 'Location' },
   { key: 'image_url', label: 'Image URL' },
+  { key: 'image_url_square', label: 'Square Image URL' },
   { key: 'info', label: 'Info' },
   { key: 'info_url', label: 'Info URL' },
   { key: 'is_featured_grid', label: 'Featured Grid' },
@@ -308,6 +312,7 @@ export default function EditEventForm({
   } | null>(null);
   const [isRegeneratingChildren, setIsRegeneratingChildren] = useState(false);
   const [showImageSelector, setShowImageSelector] = useState(false);
+  const [showSquareImageSelector, setShowSquareImageSelector] = useState(false);
   const [imageFocusCover, setImageFocusCover] = useState<ImageFocusPoint>(DEFAULT_IMAGE_FOCUS);
   const [imageFocusSquare, setImageFocusSquare] = useState<ImageFocusPoint>(DEFAULT_IMAGE_FOCUS);
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
@@ -322,6 +327,7 @@ export default function EditEventForm({
     time: '',
     location: '',
     image_url: '',
+    image_url_square: '',
     info: '',
     info_url: '',
     is_recurring: false,
@@ -523,6 +529,7 @@ export default function EditEventForm({
           time: copiedEvent?.time ?? '',
           location: copiedEvent?.location ?? '',
           image_url: copiedEvent?.image_url ?? '',
+          image_url_square: copiedEvent?.image_url_square ?? '',
           info: copiedEvent?.info ?? '',
           info_url: copiedEvent?.info_url ?? '',
           is_recurring: false
@@ -553,6 +560,7 @@ export default function EditEventForm({
             time: dbEvent.time ?? '',
             location: dbEvent.location ?? '',
             image_url: dbEvent.image_url ?? '',
+            image_url_square: dbEvent.image_url_square ?? '',
             info: dbEvent.info ?? '',
             info_url: dbEvent.info_url ?? '',
 
@@ -631,7 +639,7 @@ export default function EditEventForm({
           ? parseInt(value) || 1
           : name === 'featured_priority'
             ? (value === '' ? null : parseInt(value))
-            : name === 'image_url'
+            : name === 'image_url' || name === 'image_url_square'
               ? value.trim()
               : value,
       ...(name === 'event_type' ? { event_subtype: '' } : {}),
@@ -665,6 +673,7 @@ export default function EditEventForm({
         time: dbEvent.time ?? '',
         location: dbEvent.location ?? '',
         image_url: dbEvent.image_url ?? '',
+        image_url_square: dbEvent.image_url_square ?? '',
         info: dbEvent.info ?? '',
         info_url: dbEvent.info_url ?? '',
         is_recurring: dbEvent.is_recurring || false,
@@ -791,6 +800,7 @@ export default function EditEventForm({
         time: event.time,
         location: event.location,
         image_url: event.image_url || null,
+        image_url_square: event.image_url_square || null,
         info: event.info,
         info_url: event.info_url,
         allowed_tags: allowedTags.length > 0 ? allowedTags : null,
@@ -860,6 +870,7 @@ export default function EditEventForm({
         buildImageFocusTag(IMAGE_FOCUS_SQUARE_TAG_PREFIX, imageFocusSquare),
       ].filter(Boolean) as string[];
       const normalizedImageUrl = normalizeOptionalText(eventData.image_url);
+      const normalizedImageUrlSquare = normalizeOptionalText(eventData.image_url_square);
 
       const payload: EventInsert = {
         allowed_tags: allowedTags.length > 0 ? allowedTags : null,
@@ -868,6 +879,7 @@ export default function EditEventForm({
         time: eventData.time,
         location: eventData.location,
         image_url: normalizedImageUrl || null,
+        image_url_square: normalizedImageUrlSquare || null,
         info: eventData.info,
         info_url: eventData.info_url,
 
@@ -1031,6 +1043,7 @@ export default function EditEventForm({
           time: event.time,
           location: event.location,
           image_url: event.image_url || null,
+          image_url_square: event.image_url_square || null,
           info: event.info,
           info_url: event.info_url,
           allowed_tags: allowedTags.length > 0 ? allowedTags : null,
@@ -1390,153 +1403,131 @@ export default function EditEventForm({
           <div className="space-y-6">
             {showEventImage && (
               <div className="p-5 border border-gray-200 rounded-2xl bg-white shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Event media</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">Event media</h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  The featured image is required and covers the widescreen placements. The
+                  square image is optional — add one if you&apos;d rather upload a dedicated
+                  square photo than crop the featured image down for the grid/thumbnail spots.
+                </p>
                 <div className="grid gap-4 md:grid-cols-2">
-                  {showEventImage && (
-                    <div className="flex flex-col gap-3">
-                      <p className="text-sm font-semibold text-gray-700">Featured Event Image</p>
-                      <div className="relative w-full aspect-[4/3] rounded-xl border border-dashed border-gray-300 bg-gray-50 overflow-hidden">
-                        {eventData.image_url ? (
-                          <Image
-                            src={eventData.image_url}
-                            alt="Event"
-                            fill
-                            className="object-cover"
-                            style={{ objectPosition: `${imageFocusCover.x}% ${imageFocusCover.y}%` }}
-                            unoptimized
-                          />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
-                            Upload a featured image
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowImageSelector(true)}
-                          className="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                        >
-                          Choose or upload image
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEventData((prev) => ({ ...prev, image_url: '' }))}
-                          className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                      <input
-                        name="image_url"
-                        value={eventData.image_url}
-                        onChange={handleChange}
-                        placeholder="Paste image URL"
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
-                        disabled={!showEventImage}
-                      />
+                  <div className="flex flex-col gap-3">
+                    <p className="text-sm font-semibold text-gray-700">Featured Event Image</p>
+                    <div className="relative w-full aspect-[4/3] rounded-xl border border-dashed border-gray-300 bg-gray-50 overflow-hidden">
                       {eventData.image_url ? (
-                        <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
-                            Crop / focal point
-                          </p>
-                          <div className="grid gap-3 md:grid-cols-2">
-                            <div className="space-y-2">
-                              <p className="text-xs font-semibold text-gray-600">Cover / widescreen (16:9)</p>
-                              <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200 bg-black/60">
-                                <Image
-                                  src={eventData.image_url}
-                                  alt="Cover focus preview"
-                                  fill
-                                  className="object-cover"
-                                  style={{ objectPosition: `${imageFocusCover.x}% ${imageFocusCover.y}%` }}
-                                  unoptimized
-                                />
-                              </div>
-                              <label className="block text-[11px] font-medium text-gray-500">
-                                Horizontal {imageFocusCover.x}%
-                              </label>
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={imageFocusCover.x}
-                                onChange={(e) =>
-                                  setImageFocusCover((prev) => ({
-                                    ...prev,
-                                    x: clampFocusValue(Number.parseInt(e.target.value, 10)),
-                                  }))
-                                }
-                                className="w-full"
-                              />
-                              <label className="block text-[11px] font-medium text-gray-500">
-                                Vertical {imageFocusCover.y}%
-                              </label>
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={imageFocusCover.y}
-                                onChange={(e) =>
-                                  setImageFocusCover((prev) => ({
-                                    ...prev,
-                                    y: clampFocusValue(Number.parseInt(e.target.value, 10)),
-                                  }))
-                                }
-                                className="w-full"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-xs font-semibold text-gray-600">Square / profile (1:1)</p>
-                              <div className="relative w-full aspect-square rounded-lg overflow-hidden border border-gray-200 bg-black/60">
-                                <Image
-                                  src={eventData.image_url}
-                                  alt="Square focus preview"
-                                  fill
-                                  className="object-cover"
-                                  style={{ objectPosition: `${imageFocusSquare.x}% ${imageFocusSquare.y}%` }}
-                                  unoptimized
-                                />
-                              </div>
-                              <label className="block text-[11px] font-medium text-gray-500">
-                                Horizontal {imageFocusSquare.x}%
-                              </label>
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={imageFocusSquare.x}
-                                onChange={(e) =>
-                                  setImageFocusSquare((prev) => ({
-                                    ...prev,
-                                    x: clampFocusValue(Number.parseInt(e.target.value, 10)),
-                                  }))
-                                }
-                                className="w-full"
-                              />
-                              <label className="block text-[11px] font-medium text-gray-500">
-                                Vertical {imageFocusSquare.y}%
-                              </label>
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={imageFocusSquare.y}
-                                onChange={(e) =>
-                                  setImageFocusSquare((prev) => ({
-                                    ...prev,
-                                    y: clampFocusValue(Number.parseInt(e.target.value, 10)),
-                                  }))
-                                }
-                                className="w-full"
-                              />
-                            </div>
-                          </div>
+                        <Image
+                          src={eventData.image_url}
+                          alt="Event"
+                          fill
+                          className="object-cover"
+                          style={{ objectPosition: `${imageFocusCover.x}% ${imageFocusCover.y}%` }}
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
+                          Upload a featured image
                         </div>
-                      ) : null}
+                      )}
                     </div>
-                  )}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowImageSelector(true)}
+                        className="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        Choose or upload image
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEventData((prev) => ({ ...prev, image_url: '' }))}
+                        className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <input
+                      name="image_url"
+                      value={eventData.image_url}
+                      onChange={handleChange}
+                      placeholder="Paste image URL"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                      disabled={!showEventImage}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <p className="text-sm font-semibold text-gray-700">Square Image (optional)</p>
+                    <div className="relative w-full aspect-square rounded-xl border border-dashed border-gray-300 bg-gray-50 overflow-hidden">
+                      {eventData.image_url_square ? (
+                        <Image
+                          src={eventData.image_url_square}
+                          alt="Event (square)"
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-center px-4 text-sm text-gray-400">
+                          {eventData.image_url
+                            ? 'No square image — the featured image will be cropped instead.'
+                            : 'Upload a square image'}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowSquareImageSelector(true)}
+                        className="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        Choose or upload image
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEventData((prev) => ({ ...prev, image_url_square: '' }))}
+                        className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <input
+                      name="image_url_square"
+                      value={eventData.image_url_square}
+                      onChange={handleChange}
+                      placeholder="Paste image URL (optional)"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                    />
+                  </div>
                 </div>
+
+                {eventData.image_url ? (
+                  <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                      Crop / focal point
+                    </p>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <ImageFocalPointPicker
+                        imageUrl={eventData.image_url}
+                        value={imageFocusCover}
+                        onChange={setImageFocusCover}
+                        aspectClassName="aspect-video"
+                        label="Cover / widescreen (16:9)"
+                        usedOn="the Up Next card on the events page"
+                      />
+                      <ImageFocalPointPicker
+                        imageUrl={eventData.image_url_square || eventData.image_url}
+                        value={imageFocusSquare}
+                        onChange={setImageFocusSquare}
+                        aspectClassName="aspect-square"
+                        label={
+                          eventData.image_url_square
+                            ? 'Square image (1:1)'
+                            : 'Square / profile (1:1) — cropped from featured image'
+                        }
+                        usedOn="the Featured grid, event list thumbnails, and the event detail page"
+                      />
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
 
@@ -1639,6 +1630,20 @@ export default function EditEventForm({
           setEventData((prev) => ({
             ...prev,
             image_url: normalizeOptionalText(publicUrl),
+          }))
+        }
+      />
+
+      <AdminImageSelectorModal
+        isOpen={showSquareImageSelector}
+        imageKind="eventImage"
+        title="Select square event image"
+        selectedUrl={eventData.image_url_square}
+        onClose={() => setShowSquareImageSelector(false)}
+        onSelect={(publicUrl) =>
+          setEventData((prev) => ({
+            ...prev,
+            image_url_square: normalizeOptionalText(publicUrl),
           }))
         }
       />

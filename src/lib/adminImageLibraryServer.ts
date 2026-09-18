@@ -171,14 +171,14 @@ async function fetchStorageAssets(imageKind: AdminImageKind) {
 async function fetchEventImageUsages() {
   const { data, error } = await supabaseAdmin
     .from("events")
-    .select("id, title, image_url, venue_logo_url")
+    .select("id, title, image_url, image_url_square, venue_logo_url")
     .order("date", { ascending: true });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return (data ?? []) as Pick<EventRow, "id" | "title" | "image_url" | "venue_logo_url">[];
+  return (data ?? []) as Pick<EventRow, "id" | "title" | "image_url" | "image_url_square" | "venue_logo_url">[];
 }
 
 async function fetchEventTypeConfig() {
@@ -249,6 +249,15 @@ async function buildUsageMap() {
       addUsage(usageMap, "eventImage", eventImageUrl, {
         usageType: "event",
         label: event.title,
+        href: `/admin/manage-events/edit?id=${event.id}`,
+      });
+    }
+
+    const eventImageSquareUrl = normalizeUrl(event.image_url_square);
+    if (eventImageSquareUrl) {
+      addUsage(usageMap, "eventImage", eventImageSquareUrl, {
+        usageType: "event",
+        label: `${event.title} (square)`,
         href: `/admin/manage-events/edit?id=${event.id}`,
       });
     }

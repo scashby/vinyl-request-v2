@@ -19,6 +19,7 @@ interface EventData {
   time?: string;
   location?: string;
   image_url?: string;
+  image_url_square?: string;
   info?: string;
   info_url?: string;
   allowed_tags?: string[] | string | null;
@@ -159,6 +160,7 @@ export default function Page() {
     time,
     location,
     image_url,
+    image_url_square,
     info,
     info_url,
     allowed_tags
@@ -184,9 +186,16 @@ export default function Page() {
     });
   };
 
-  const imageSrc = image_url?.includes('dropbox.com')
-    ? image_url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace(/\?.*$/, '')
-    : image_url || '/images/event-header-still.jpg';
+  const fixDropboxUrl = (url: string) =>
+    url.includes('dropbox.com')
+      ? url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace(/\?.*$/, '')
+      : url;
+
+  const imageSrc = image_url_square
+    ? fixDropboxUrl(image_url_square)
+    : image_url
+      ? fixDropboxUrl(image_url)
+      : '/images/event-header-still.jpg';
   const squareFocus = getImageFocusFromTags(allowed_tags, IMAGE_FOCUS_SQUARE_TAG_PREFIX);
 
   const navigateToEvent = (eventId: number | null) => {
