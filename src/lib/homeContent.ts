@@ -15,7 +15,8 @@ export interface HeroData {
   primary_cta_href: string;
   secondary_cta_label: string;
   secondary_cta_href: string;
-  photo_placeholder_text: string; // may contain "{venue}"
+  photo_url: string; // shown instead of the placeholder once set
+  photo_placeholder_text: string; // may contain "{venue}"; shown until photo_url is set
 }
 
 export interface ResidencyData {
@@ -46,7 +47,8 @@ export interface GameDeckData {
   chips: string[];
   cta_label: string;
   cta_href: string;
-  photo_placeholder_text: string;
+  photo_url: string; // shown instead of the placeholder once set
+  photo_placeholder_text: string; // shown until photo_url is set
 }
 
 export interface DialoguesTeaserData {
@@ -112,6 +114,7 @@ export const DEFAULT_SECTIONS: {
     primary_cta_href: '/events/events-page',
     secondary_cta_label: 'Book a Private Event',
     secondary_cta_href: '/about',
+    photo_url: '',
     photo_placeholder_text: 'Photo coming soon — Steve at the decks, {venue}',
   },
   residency: {
@@ -142,6 +145,7 @@ export const DEFAULT_SECTIONS: {
     chips: ['Vinyl Bingo', 'Cover Art Clue Chase', 'Decade Dash'],
     cta_label: 'Explore Vinyl Game Deck →',
     cta_href: 'https://vinylgamedeck.com',
+    photo_url: '',
     photo_placeholder_text: 'Photo coming soon — Vinyl Bingo on a brewery table',
   },
   dialogues_teaser: {

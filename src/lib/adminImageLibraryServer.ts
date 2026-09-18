@@ -25,7 +25,9 @@ type ImageKindConfig = {
   bucketName: string;
   prefix: string;
   label: string;
-  eventField: "image_url" | "venue_logo_url";
+  // Only event-linked kinds have one; homepage photos live in
+  // homepage_sections, not the events table.
+  eventField?: "image_url" | "venue_logo_url";
 };
 
 type AssetIdentity = {
@@ -48,6 +50,11 @@ const IMAGE_KIND_CONFIG: Record<AdminImageKind, ImageKindConfig> = {
     prefix: "venue-logos",
     label: "Venue logo",
     eventField: "venue_logo_url",
+  },
+  homepageImage: {
+    bucketName: "homepage-images",
+    prefix: "homepage-images",
+    label: "Homepage photo",
   },
 };
 

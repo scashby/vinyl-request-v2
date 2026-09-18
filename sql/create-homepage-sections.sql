@@ -53,6 +53,7 @@ INSERT INTO homepage_sections (page, section_type, position, data) VALUES
   "primary_cta_href": "/events/events-page",
   "secondary_cta_label": "Book a Private Event",
   "secondary_cta_href": "/about",
+  "photo_url": "",
   "photo_placeholder_text": "Photo coming soon — Steve at the decks, {venue}"
 }'::jsonb),
 ('home', 'residency', 2, '{
@@ -80,6 +81,7 @@ INSERT INTO homepage_sections (page, section_type, position, data) VALUES
   "chips": ["Vinyl Bingo", "Cover Art Clue Chase", "Decade Dash"],
   "cta_label": "Explore Vinyl Game Deck →",
   "cta_href": "https://vinylgamedeck.com",
+  "photo_url": "",
   "photo_placeholder_text": "Photo coming soon — Vinyl Bingo on a brewery table"
 }'::jsonb),
 ('home', 'dialogues_teaser', 6, '{

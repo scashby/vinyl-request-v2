@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { Container } from 'components/ui/Container';
 import { fillTokens, type HeroData } from 'src/lib/homeContent';
@@ -42,19 +43,31 @@ export function HeroSection({
         </div>
         <div className="flex-1 min-w-0 w-full max-w-md md:max-w-none relative pt-3">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[18px] h-[18px] rounded-full bg-[var(--dwd-accent-2)] border-2 border-[var(--dwd-ink)] z-10" />
-          <div
-            className="w-full aspect-[4/5] flex items-center justify-center overflow-hidden [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)] [transform:rotate(var(--dwd-tilt-1))]"
-            style={{
-              background:
-                'repeating-linear-gradient(135deg, color-mix(in srgb, var(--dwd-accent-3) 55%, white), color-mix(in srgb, var(--dwd-accent-3) 55%, white) 18px, var(--dwd-accent-3) 18px, var(--dwd-accent-3) 36px)',
-            }}
-          >
-            <div className="absolute inset-[18px] rounded-xl bg-[var(--dwd-bg)]/90 flex items-center justify-center text-center p-6">
-              <span className="text-sm font-bold uppercase tracking-wider text-[var(--dwd-accent-1)]">
-                {fillTokens(data.photo_placeholder_text, tokens)}
-              </span>
+          {data.photo_url ? (
+            <div className="relative w-full aspect-[4/5] overflow-hidden [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)] [transform:rotate(var(--dwd-tilt-1))]">
+              <Image
+                src={data.photo_url}
+                alt="Steve at the decks"
+                fill
+                className="object-cover"
+                unoptimized
+              />
             </div>
-          </div>
+          ) : (
+            <div
+              className="w-full aspect-[4/5] flex items-center justify-center overflow-hidden [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)] [transform:rotate(var(--dwd-tilt-1))]"
+              style={{
+                background:
+                  'repeating-linear-gradient(135deg, color-mix(in srgb, var(--dwd-accent-3) 55%, white), color-mix(in srgb, var(--dwd-accent-3) 55%, white) 18px, var(--dwd-accent-3) 18px, var(--dwd-accent-3) 36px)',
+              }}
+            >
+              <div className="absolute inset-[18px] rounded-xl bg-[var(--dwd-bg)]/90 flex items-center justify-center text-center p-6">
+                <span className="text-sm font-bold uppercase tracking-wider text-[var(--dwd-accent-1)]">
+                  {fillTokens(data.photo_placeholder_text, tokens)}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Container>

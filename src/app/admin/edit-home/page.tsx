@@ -6,6 +6,8 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import Image from "next/image";
+import AdminImageSelectorModal from "src/components/admin/AdminImageSelectorModal";
 import {
   DEFAULT_SECTIONS,
   SECTION_LABELS,
@@ -118,6 +120,53 @@ function Field({
   );
 }
 
+function PhotoField({
+  label,
+  url,
+  onChoose,
+  onClear,
+}: {
+  label: string;
+  url: string;
+  onChoose: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <div>
+      <label className={labelClass}>{label}</label>
+      <div className="flex items-center gap-3">
+        <div className="relative w-20 h-20 rounded-lg border border-gray-300 bg-gray-50 overflow-hidden shrink-0">
+          {url ? (
+            <Image src={url} alt="" fill className="object-cover" unoptimized />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 text-center px-1">
+              No photo
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onChoose}
+            className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Choose or upload photo
+          </button>
+          {url && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SectionCard({
   type,
   visible,
@@ -182,6 +231,7 @@ export default function EditHomePage() {
   const [gameDeck, setGameDeck] = useSectionState<GameDeckData>(DEFAULT_SECTIONS.game_deck);
   const [dialoguesTeaser, setDialoguesTeaser] = useSectionState<DialoguesTeaserData>(DEFAULT_SECTIONS.dialogues_teaser);
   const [connect, setConnect] = useSectionState<ConnectData>(DEFAULT_SECTIONS.connect);
+  const [photoModalTarget, setPhotoModalTarget] = useState<"hero" | "game_deck" | null>(null);
 
   useEffect(() => {
     fetch("/api/homepage-sections?page=home")
@@ -285,8 +335,14 @@ export default function EditHomePage() {
           <Field label="Secondary button label" value={hero.data.secondary_cta_label} onChange={(v) => setHero({ ...hero, data: { ...hero.data, secondary_cta_label: v } })} />
           <Field label="Secondary button link" value={hero.data.secondary_cta_href} onChange={(v) => setHero({ ...hero, data: { ...hero.data, secondary_cta_href: v } })} />
         </div>
+        <PhotoField
+          label="Hero photo"
+          url={hero.data.photo_url}
+          onChoose={() => setPhotoModalTarget("hero")}
+          onClear={() => setHero({ ...hero, data: { ...hero.data, photo_url: "" } })}
+        />
         <Field
-          label="Hero photo placeholder text (shown until a real photo is added)"
+          label="Placeholder text (shown until a photo is added above)"
           value={hero.data.photo_placeholder_text}
           onChange={(v) => setHero({ ...hero, data: { ...hero.data, photo_placeholder_text: v } })}
         />
@@ -371,8 +427,14 @@ export default function EditHomePage() {
           <Field label="Button label" value={gameDeck.data.cta_label} onChange={(v) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, cta_label: v } })} />
           <Field label="Button link" value={gameDeck.data.cta_href} onChange={(v) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, cta_href: v } })} />
         </div>
+        <PhotoField
+          label="Photo"
+          url={gameDeck.data.photo_url}
+          onChoose={() => setPhotoModalTarget("game_deck")}
+          onClear={() => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_url: "" } })}
+        />
         <Field
-          label="Photo placeholder text"
+          label="Placeholder text (shown until a photo is added above)"
           value={gameDeck.data.photo_placeholder_text}
           onChange={(v) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_placeholder_text: v } })}
         />
@@ -454,7 +516,7 @@ export default function EditHomePage() {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <Field
-            label="Spotify fallback label (shown if no playlist is set in Playlists)"
+            label="Spotify label (links to the Spotify URL in Social links below)"
             value={connect.data.spotify_fallback_label}
             onChange={(v) => setConnect({ ...connect, data: { ...connect.data, spotify_fallback_label: v } })}
           />
@@ -470,6 +532,24 @@ export default function EditHomePage() {
         Sections shown: {SECTION_TYPES.length}. Reordering/adding/removing sections isn&rsquo;t available yet — coming
         in a later pass.
       </p>
+
+      <AdminImageSelectorModal
+        isOpen={photoModalTarget === "hero"}
+        imageKind="homepageImage"
+        title="Select hero photo"
+        selectedUrl={hero.data.photo_url}
+        onClose={() => setPhotoModalTarget(null)}
+        onSelect={(publicUrl) => setHero({ ...hero, data: { ...hero.data, photo_url: publicUrl } })}
+      />
+
+      <AdminImageSelectorModal
+        isOpen={photoModalTarget === "game_deck"}
+        imageKind="homepageImage"
+        title="Select Vinyl Game Deck photo"
+        selectedUrl={gameDeck.data.photo_url}
+        onClose={() => setPhotoModalTarget(null)}
+        onSelect={(publicUrl) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_url: publicUrl } })}
+      />
     </div>
   );
 }
