@@ -1,4 +1,11 @@
-// src/components/admin/EventImageCropModal.tsx
+// src/components/admin/ImageCropModal.tsx
+//
+// Generic crop modal — a dedicated screen for cropping one image to one
+// locked aspect ratio, opened on an explicit "Edit crop" click. Used
+// anywhere in the admin an uploaded photo needs to be positioned within a
+// fixed-aspect slot: event images (EditEventForm) and homepage photos
+// (admin/edit-home). Holds no event- or homepage-specific logic itself —
+// callers own the data (an ImageCropRect) and where it's stored.
 "use client";
 
 import { useEffect, useState } from "react";
@@ -14,7 +21,7 @@ type Props = {
   onClose: () => void;
 };
 
-export default function EventImageCropModal({
+export default function ImageCropModal({
   imageUrl,
   initialCrop,
   aspect,

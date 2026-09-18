@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import AdminImageSelectorModal from 'src/components/admin/AdminImageSelectorModal';
-import EventImageCropModal from 'src/components/admin/EventImageCropModal';
+import ImageCropModal from 'src/components/admin/ImageCropModal';
 import { supabase } from 'src/lib/supabaseClient';
 import type { Database } from 'types/supabase';
 import {
@@ -1660,7 +1660,7 @@ export default function EditEventForm({
       />
 
       {cropModalTarget === 'cover' && (
-        <EventImageCropModal
+        <ImageCropModal
           imageUrl={eventData.image_url}
           initialCrop={imageCropCover}
           aspect={16 / 9}
@@ -1671,7 +1671,7 @@ export default function EditEventForm({
       )}
 
       {cropModalTarget === 'square' && (
-        <EventImageCropModal
+        <ImageCropModal
           imageUrl={eventData.image_url_square || eventData.image_url}
           initialCrop={imageCropSquare}
           aspect={1}
