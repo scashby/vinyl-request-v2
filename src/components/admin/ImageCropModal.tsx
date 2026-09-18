@@ -12,6 +12,14 @@ import { useEffect, useState } from "react";
 import Cropper, { type Area } from "react-easy-crop";
 import { isDefaultCrop, type ImageCropRect } from "src/lib/imageCrop";
 
+// zoom < 1 shrinks the image within its locked-aspect crop window, useful
+// when the crop window's aspect doesn't match the source photo's own
+// aspect (e.g. a tall logo cropped into a wide landscape slot) — without
+// it, the only way to see more of the photo's other axis is already
+// "everything visible" at zoom 1, with nowhere to go but tighter.
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3;
+
 type Props = {
   imageUrl: string;
   initialCrop: ImageCropRect;
@@ -65,6 +73,8 @@ export default function ImageCropModal({
             image={imageUrl}
             crop={crop}
             zoom={zoom}
+            minZoom={MIN_ZOOM}
+            maxZoom={MAX_ZOOM}
             aspect={aspect}
             objectFit="contain"
             initialCroppedAreaPercentages={isDefaultCrop(initialCrop) ? undefined : initialCrop}
@@ -86,8 +96,8 @@ export default function ImageCropModal({
             <span className="w-10 shrink-0">Zoom</span>
             <input
               type="range"
-              min={1}
-              max={3}
+              min={MIN_ZOOM}
+              max={MAX_ZOOM}
               step={0.1}
               value={zoom}
               onChange={(e) => setZoom(Number.parseFloat(e.target.value))}
