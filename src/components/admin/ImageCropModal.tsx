@@ -12,12 +12,19 @@ import { useEffect, useState } from "react";
 import Cropper, { type Area } from "react-easy-crop";
 import { isDefaultCrop, type ImageCropRect } from "src/lib/imageCrop";
 
-// zoom < 1 shrinks the image within its locked-aspect crop window, useful
-// when the crop window's aspect doesn't match the source photo's own
-// aspect (e.g. a tall logo cropped into a wide landscape slot) — without
-// it, the only way to see more of the photo's other axis is already
-// "everything visible" at zoom 1, with nowhere to go but tighter.
-const MIN_ZOOM = 0.5;
+// zoom must stay >= 1. react-easy-crop's crop-percentage math (see
+// limitArea() in the library) assumes the crop window is always fully
+// covered by the image; below the zoom where that stops being true for a
+// given aspect mismatch, it silently clamps the reported crop to a
+// degenerate {x:0,y:0,width:100,height:100} instead of erroring — which
+// looks fine while dragging in the modal but saves garbage. Confirmed by
+// direct reproduction: zoom 0.5 on a portrait photo in this app's
+// landscape Game Deck slot saved exactly that degenerate rectangle,
+// silently discarding whatever crop had actually been dragged into view.
+// There is no min-zoom value below 1 that's safe for every image/aspect
+// combination, so 1 — "the crop window is always full of image, never
+// invalid" — is the only correct floor.
+const MIN_ZOOM = 1;
 const MAX_ZOOM = 3;
 
 type Props = {

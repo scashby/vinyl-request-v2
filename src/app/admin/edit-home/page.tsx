@@ -125,6 +125,7 @@ function PhotoField({
   label,
   url,
   crop,
+  aspectClassName,
   onChoose,
   onEditCrop,
   onClear,
@@ -132,6 +133,13 @@ function PhotoField({
   label: string;
   url: string;
   crop: ImageCropRect;
+  // Must match the real destination's locked crop aspect (passed to
+  // ImageCropModal's `aspect` for the same photo). cropRectImageStyle's
+  // math only avoids distortion when the box it's rendered into has the
+  // same aspect ratio as the crop rectangle itself — a generic square
+  // thumbnail here would stretch a 4:5 or 7:5 crop to fit, showing a
+  // visibly different (squashed) framing than what's actually saved.
+  aspectClassName: string;
   onChoose: () => void;
   onEditCrop: () => void;
   onClear: () => void;
@@ -140,7 +148,7 @@ function PhotoField({
     <div>
       <label className={labelClass}>{label}</label>
       <div className="flex items-center gap-3">
-        <div className="relative w-20 h-20 rounded-lg border border-gray-300 bg-gray-50 overflow-hidden shrink-0">
+        <div className={`relative w-20 ${aspectClassName} rounded-lg border border-gray-300 bg-gray-50 overflow-hidden shrink-0`}>
           {url ? (
             // eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express
             <img src={url} alt="" style={cropRectImageStyle(crop)} />
@@ -355,6 +363,7 @@ export default function EditHomePage() {
           label="Hero photo"
           url={hero.data.photo_url}
           crop={hero.data.photo_crop}
+          aspectClassName="aspect-[4/5]"
           onChoose={() => setPhotoModalTarget("hero")}
           onEditCrop={() => setCropModalTarget("hero")}
           onClear={() => setHero({ ...hero, data: { ...hero.data, photo_url: "", photo_crop: DEFAULT_IMAGE_CROP } })}
@@ -449,6 +458,7 @@ export default function EditHomePage() {
           label="Photo"
           url={gameDeck.data.photo_url}
           crop={gameDeck.data.photo_crop}
+          aspectClassName="aspect-[7/5]"
           onChoose={() => setPhotoModalTarget("game_deck")}
           onEditCrop={() => setCropModalTarget("game_deck")}
           onClear={() => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_url: "", photo_crop: DEFAULT_IMAGE_CROP } })}
