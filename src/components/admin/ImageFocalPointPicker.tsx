@@ -3,11 +3,15 @@
 
 import { useCallback, useRef, useState } from "react";
 import Image from "next/image";
+import {
+  clampFocusPercent,
+  clampFocusZoom,
+  DEFAULT_IMAGE_FOCUS,
+  imageFocusStyle,
+  type ImageFocusPoint,
+} from "src/lib/imageFocus";
 
-export type ImageFocusPoint = { x: number; y: number };
-
-const clamp = (value: number, min = 0, max = 100) =>
-  Math.max(min, Math.min(max, value));
+export type { ImageFocusPoint };
 
 type Props = {
   imageUrl: string;
@@ -18,11 +22,12 @@ type Props = {
   usedOn: string;
 };
 
-// Drag-to-reposition focal point picker. Grab the photo and move it, the
-// same way Facebook/LinkedIn cover-photo repositioning works — no sliders,
-// no separate "preview" to interpret, the frame you drag *is* the crop
-// that will actually render on the site (same object-fit: cover +
-// object-position math used everywhere this focus point is consumed).
+// Drag-to-pan + zoom focal point picker — the same pan/zoom-within-a-fixed-
+// frame pattern Instagram/Facebook/LinkedIn use for profile and cover
+// photos. The frame you edit *is* the crop that actually renders on the
+// site: imageFocusStyle() (src/lib/imageFocus.ts) produces the exact same
+// object-position/transform this preview uses, so there's nothing to
+// translate between "what you see here" and "what ships."
 export default function ImageFocalPointPicker({
   imageUrl,
   value,
@@ -41,13 +46,20 @@ export default function ImageFocalPointPicker({
       const drag = dragState.current;
       if (!frame || !drag) return;
 
+      // Panning distance is relative to the frame, scaled down by the
+      // current zoom — at 2x zoom the image is twice as large, so the same
+      // screen-pixel drag should move the anchor half as far in the
+      // underlying image's coordinate space to keep the pan speed feeling
+      // consistent under the cursor.
       const rect = frame.getBoundingClientRect();
-      const dxPercent = ((e.clientX - drag.startX) / rect.width) * 100;
-      const dyPercent = ((e.clientY - drag.startY) / rect.height) * 100;
+      const zoomFactor = drag.origin.zoom / 100;
+      const dxPercent = (((e.clientX - drag.startX) / rect.width) * 100) / zoomFactor;
+      const dyPercent = (((e.clientY - drag.startY) / rect.height) * 100) / zoomFactor;
 
       onChange({
-        x: clamp(Math.round(drag.origin.x - dxPercent)),
-        y: clamp(Math.round(drag.origin.y - dyPercent)),
+        x: clampFocusPercent(drag.origin.x - dxPercent),
+        y: clampFocusPercent(drag.origin.y - dyPercent),
+        zoom: drag.origin.zoom,
       });
     },
     [onChange]
@@ -68,6 +80,11 @@ export default function ImageFocalPointPicker({
     window.addEventListener("pointerup", stopDragging);
   };
 
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    onChange({ ...value, zoom: clampFocusZoom(value.zoom - e.deltaY * 0.2) });
+  };
+
   return (
     <div className="space-y-2">
       <div>
@@ -77,6 +94,7 @@ export default function ImageFocalPointPicker({
       <div
         ref={frameRef}
         onPointerDown={handlePointerDown}
+        onWheel={handleWheel}
         className={`relative w-full ${aspectClassName} rounded-lg overflow-hidden border border-gray-300 select-none touch-none ${
           isDragging ? "cursor-grabbing" : "cursor-grab"
         }`}
@@ -87,20 +105,36 @@ export default function ImageFocalPointPicker({
           fill
           draggable={false}
           className="object-cover pointer-events-none"
-          style={{ objectPosition: `${value.x}% ${value.y}%` }}
+          style={imageFocusStyle(value)}
           unoptimized
         />
       </div>
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] text-gray-500 shrink-0">Zoom</span>
+        <input
+          type="range"
+          min={100}
+          max={300}
+          step={5}
+          value={value.zoom}
+          onChange={(e) => onChange({ ...value, zoom: clampFocusZoom(Number.parseInt(e.target.value, 10)) })}
+          className="w-full"
+          aria-label={`${label} zoom`}
+        />
+        <span className="text-[11px] text-gray-500 shrink-0 w-8 text-right">
+          {(value.zoom / 100).toFixed(1)}x
+        </span>
+      </div>
       <div className="flex items-center justify-between">
         <p className="text-[11px] text-gray-500">
-          Drag the photo to reposition &middot; {value.x}%, {value.y}%
+          Drag to pan, scroll to zoom &middot; {value.x}%, {value.y}%
         </p>
         <button
           type="button"
-          onClick={() => onChange({ x: 50, y: 50 })}
+          onClick={() => onChange(DEFAULT_IMAGE_FOCUS)}
           className="text-[11px] font-semibold text-blue-600 hover:text-blue-700"
         >
-          Reset to center
+          Reset
         </button>
       </div>
     </div>

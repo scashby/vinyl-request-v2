@@ -16,17 +16,20 @@ import {
   type EventTypeConfigState,
   mergeEventTypeConfig,
 } from 'src/lib/eventTypeConfig';
+import {
+  buildImageFocusTag,
+  DEFAULT_IMAGE_FOCUS,
+  IMAGE_FOCUS_COVER_TAG_PREFIX,
+  IMAGE_FOCUS_SQUARE_TAG_PREFIX,
+  imageFocusStyle,
+  parseImageFocusTag,
+  type ImageFocusPoint,
+} from 'src/lib/imageFocus';
 
 const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
 
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
 const EVENT_SUBTYPE_TAG_PREFIX = 'event_subtype:';
-const IMAGE_FOCUS_COVER_TAG_PREFIX = 'image_focus_cover:';
-const IMAGE_FOCUS_SQUARE_TAG_PREFIX = 'image_focus_square:';
-
-type ImageFocusPoint = { x: number; y: number };
-
-const DEFAULT_IMAGE_FOCUS: ImageFocusPoint = { x: 50, y: 50 };
 
 const TEMPLATE_FIELDS = ['date', 'time', 'location', 'image_url', 'info', 'info_url', 'recurrence'];
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
@@ -193,27 +196,6 @@ function getTagValue(tags: string[], prefix: string): string {
 function buildTag(prefix: string, value?: string) {
   if (!value) return null;
   return `${prefix}${value}`;
-}
-
-function clampFocusValue(value: number): number {
-  if (!Number.isFinite(value)) return 50;
-  return Math.min(100, Math.max(0, Math.round(value)));
-}
-
-function parseImageFocusTag(tags: string[], prefix: string): ImageFocusPoint {
-  const value = getTagValue(tags, prefix);
-  if (!value) return DEFAULT_IMAGE_FOCUS;
-  const [xRaw, yRaw] = value.split(':');
-  const x = Number.parseFloat(xRaw ?? '50');
-  const y = Number.parseFloat(yRaw ?? '50');
-  return {
-    x: clampFocusValue(x),
-    y: clampFocusValue(y),
-  };
-}
-
-function buildImageFocusTag(prefix: string, focus: ImageFocusPoint): string {
-  return `${prefix}${clampFocusValue(focus.x)}:${clampFocusValue(focus.y)}`;
 }
 
 function normalizeOptionalText(value: unknown): string {
@@ -1419,7 +1401,7 @@ export default function EditEventForm({
                           alt="Event"
                           fill
                           className="object-cover"
-                          style={{ objectPosition: `${imageFocusCover.x}% ${imageFocusCover.y}%` }}
+                          style={imageFocusStyle(imageFocusCover)}
                           unoptimized
                         />
                       ) : (
