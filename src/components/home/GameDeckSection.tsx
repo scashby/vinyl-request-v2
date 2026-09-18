@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Container } from 'components/ui/Container';
 import type { GameDeckData } from 'src/lib/homeContent';
-import { cropRectImageStyle } from 'src/lib/imageCrop';
+import { imageFocusStyle } from 'src/lib/imageCrop';
 
 export function GameDeckSection({ data }: { data: GameDeckData }) {
   const isExternal = /^https?:\/\//.test(data.cta_href);
@@ -49,12 +49,17 @@ export function GameDeckSection({ data }: { data: GameDeckData }) {
           )}
         </div>
         {data.photo_url ? (
-          <div className="relative w-full sm:w-[220px] aspect-[3/4] flex-shrink-0 overflow-hidden -rotate-[1.8deg] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]">
-            {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
-            <img src={data.photo_url} alt="Vinyl Game Deck in action" style={cropRectImageStyle(data.photo_crop)} />
+          <div className="relative w-full sm:w-[280px] aspect-[7/5] flex-shrink-0 overflow-hidden -rotate-[1.8deg] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]">
+            {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
+            <img
+              src={data.photo_url}
+              alt="Vinyl Game Deck in action"
+              className="absolute inset-0 h-full w-full object-cover"
+              style={imageFocusStyle(data.photo_crop)}
+            />
           </div>
         ) : (
-          <div className="w-full sm:w-[220px] aspect-[3/4] flex-shrink-0 flex items-center justify-center text-center p-4 -rotate-[1.8deg] bg-[var(--dwd-bg)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]">
+          <div className="w-full sm:w-[280px] aspect-[7/5] flex-shrink-0 flex items-center justify-center text-center p-4 -rotate-[1.8deg] bg-[var(--dwd-bg)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]">
             <span className="text-[13px] font-bold uppercase tracking-wider text-[var(--dwd-accent-1)]">
               {data.photo_placeholder_text}
             </span>

@@ -7,8 +7,8 @@ import { formatEventText } from "src/utils/textFormatter";
 import { Container } from "components/ui/Container";
 import { useActiveTheme } from "src/lib/useActiveTheme";
 import {
-  cropRectImageStyle,
-  getImageCropFromTags,
+  getImageFocusFromTags,
+  imageFocusStyle,
   IMAGE_FOCUS_COVER_TAG_PREFIX,
   IMAGE_FOCUS_SQUARE_TAG_PREFIX,
 } from "src/lib/imageCrop";
@@ -262,7 +262,7 @@ export default function Page() {
                         ev.date === "" ||
                         ev.date === "9999-12-31";
                       const displayTitle = getDisplayTitle(ev);
-                      const coverCrop = getImageCropFromTags(
+                      const coverCrop = getImageFocusFromTags(
                         ev.allowed_tags,
                         IMAGE_FOCUS_COVER_TAG_PREFIX
                       );
@@ -279,7 +279,7 @@ export default function Page() {
                           >
                             <div className="relative w-full aspect-video">
                               {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
-                              <img src={img} alt={displayTitle} style={cropRectImageStyle(coverCrop)} />
+                              <img src={img} alt={displayTitle} className="absolute inset-0 h-full w-full object-cover" style={imageFocusStyle(coverCrop)} />
                             </div>
                             <div className="p-6 pb-7">
                               <div
@@ -319,7 +319,7 @@ export default function Page() {
                       const d = compactDate(e.date);
                       const tba = !e.date || e.date === "" || e.date === "9999-12-31";
                       const displayTitle = getDisplayTitle(e);
-                      const squareCrop = getImageCropFromTags(
+                      const squareCrop = getImageFocusFromTags(
                         e.allowed_tags,
                         IMAGE_FOCUS_SQUARE_TAG_PREFIX
                       );
@@ -333,7 +333,7 @@ export default function Page() {
                           <div className="overflow-hidden flex flex-col transition-all duration-200 group-hover:-translate-y-1 bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] rounded-lg">
                             <div className="relative w-full pt-[100%]">
                               {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
-                              <img src={img} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
+                              <img src={img} alt={displayTitle} className="absolute inset-0 h-full w-full object-cover" style={imageFocusStyle(squareCrop)} />
                             </div>
                             <div className="p-4">
                               <h4
@@ -365,7 +365,7 @@ export default function Page() {
                       const img =
                         e.image_url_square || e.image_url || "/images/coverplaceholder.png";
                       const displayTitle = getDisplayTitle(e);
-                      const squareCrop = getImageCropFromTags(
+                      const squareCrop = getImageFocusFromTags(
                         e.allowed_tags,
                         IMAGE_FOCUS_SQUARE_TAG_PREFIX
                       );
@@ -381,7 +381,7 @@ export default function Page() {
 
                             <div className="relative w-full h-[150px] rounded-md overflow-hidden hidden md:block">
                               {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
-                              <img src={img} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
+                              <img src={img} alt={displayTitle} className="absolute inset-0 h-full w-full object-cover" style={imageFocusStyle(squareCrop)} />
                             </div>
 
                             <div className="min-w-0 col-span-1 md:col-span-1">

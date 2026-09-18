@@ -8,7 +8,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import AdminImageSelectorModal from "src/components/admin/AdminImageSelectorModal";
 import ImageCropModal from "src/components/admin/ImageCropModal";
-import { cropRectImageStyle, DEFAULT_IMAGE_CROP, type ImageCropRect } from "src/lib/imageCrop";
+import { DEFAULT_IMAGE_FOCUS, imageFocusStyle, type ImageFocus } from "src/lib/imageCrop";
 import {
   DEFAULT_SECTIONS,
   SECTION_LABELS,
@@ -132,13 +132,11 @@ function PhotoField({
 }: {
   label: string;
   url: string;
-  crop: ImageCropRect;
-  // Must match the real destination's locked crop aspect (passed to
-  // ImageCropModal's `aspect` for the same photo). cropRectImageStyle's
-  // math only avoids distortion when the box it's rendered into has the
-  // same aspect ratio as the crop rectangle itself — a generic square
-  // thumbnail here would stretch a 4:5 or 7:5 crop to fit, showing a
-  // visibly different (squashed) framing than what's actually saved.
+  crop: ImageFocus;
+  // Must match the real destination's locked aspect (passed to
+  // ImageCropModal's `aspectClassName` for the same photo) so this preview
+  // agrees with both the crop modal and the live site for the same saved
+  // focus — a generic square thumbnail would stretch a 4:5 or 7:5 photo.
   aspectClassName: string;
   onChoose: () => void;
   onEditCrop: () => void;
@@ -150,8 +148,8 @@ function PhotoField({
       <div className="flex items-center gap-3">
         <div className={`relative w-20 ${aspectClassName} rounded-lg border border-gray-300 bg-gray-50 overflow-hidden shrink-0`}>
           {url ? (
-            // eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express
-            <img src={url} alt="" style={cropRectImageStyle(crop)} />
+            // eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly
+            <img src={url} alt="" className="absolute inset-0 h-full w-full object-cover" style={imageFocusStyle(crop)} />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 text-center px-1">
               No photo
@@ -366,7 +364,7 @@ export default function EditHomePage() {
           aspectClassName="aspect-[4/5]"
           onChoose={() => setPhotoModalTarget("hero")}
           onEditCrop={() => setCropModalTarget("hero")}
-          onClear={() => setHero({ ...hero, data: { ...hero.data, photo_url: "", photo_crop: DEFAULT_IMAGE_CROP } })}
+          onClear={() => setHero({ ...hero, data: { ...hero.data, photo_url: "", photo_crop: DEFAULT_IMAGE_FOCUS } })}
         />
         <Field
           label="Placeholder text (shown until a photo is added above)"
@@ -458,10 +456,10 @@ export default function EditHomePage() {
           label="Photo"
           url={gameDeck.data.photo_url}
           crop={gameDeck.data.photo_crop}
-          aspectClassName="aspect-[3/4]"
+          aspectClassName="aspect-[7/5]"
           onChoose={() => setPhotoModalTarget("game_deck")}
           onEditCrop={() => setCropModalTarget("game_deck")}
-          onClear={() => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_url: "", photo_crop: DEFAULT_IMAGE_CROP } })}
+          onClear={() => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_url: "", photo_crop: DEFAULT_IMAGE_FOCUS } })}
         />
         <Field
           label="Placeholder text (shown until a photo is added above)"
@@ -570,7 +568,7 @@ export default function EditHomePage() {
         selectedUrl={hero.data.photo_url}
         onClose={() => setPhotoModalTarget(null)}
         onSelect={(publicUrl) => {
-          setHero({ ...hero, data: { ...hero.data, photo_url: publicUrl, photo_crop: DEFAULT_IMAGE_CROP } });
+          setHero({ ...hero, data: { ...hero.data, photo_url: publicUrl, photo_crop: DEFAULT_IMAGE_FOCUS } });
           setCropModalTarget("hero");
         }}
       />
@@ -582,7 +580,7 @@ export default function EditHomePage() {
         selectedUrl={gameDeck.data.photo_url}
         onClose={() => setPhotoModalTarget(null)}
         onSelect={(publicUrl) => {
-          setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_url: publicUrl, photo_crop: DEFAULT_IMAGE_CROP } });
+          setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_url: publicUrl, photo_crop: DEFAULT_IMAGE_FOCUS } });
           setCropModalTarget("game_deck");
         }}
       />
@@ -590,8 +588,8 @@ export default function EditHomePage() {
       {cropModalTarget === "hero" && (
         <ImageCropModal
           imageUrl={hero.data.photo_url}
-          initialCrop={hero.data.photo_crop}
-          aspect={4 / 5}
+          initialFocus={hero.data.photo_crop}
+          aspectClassName="aspect-[4/5]"
           title="Crop hero photo (4:5)"
           onSave={(crop) => setHero({ ...hero, data: { ...hero.data, photo_crop: crop } })}
           onClose={() => setCropModalTarget(null)}
@@ -601,9 +599,9 @@ export default function EditHomePage() {
       {cropModalTarget === "game_deck" && (
         <ImageCropModal
           imageUrl={gameDeck.data.photo_url}
-          initialCrop={gameDeck.data.photo_crop}
-          aspect={3 / 4}
-          title="Crop Vinyl Game Deck photo"
+          initialFocus={gameDeck.data.photo_crop}
+          aspectClassName="aspect-[7/5]"
+          title="Crop Vinyl Game Deck photo (7:5)"
           onSave={(crop) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_crop: crop } })}
           onClose={() => setCropModalTarget(null)}
         />
