@@ -4,13 +4,14 @@
 // approximated anchor point + zoom factor), the tag encoding that stores
 // them, and the CSS to render a stored rectangle.
 //
-// Editing goes through react-easy-crop (src/components/admin/
-// EventImageCropper.tsx) — the same pan-the-whole-photo, zoom-in,
-// aspect-locked crop interaction Instagram/Facebook/Twitter/LinkedIn all
-// use. Its own percentage-based crop output (onCropComplete's first
-// argument, and initialCroppedAreaPercentages for reloading a saved crop)
-// is exactly the ImageCropRect shape stored here — no lossy conversion in
-// either direction.
+// Editing goes through react-easy-crop, opened from a dedicated modal
+// (src/components/admin/EventImageCropModal.tsx) — the same
+// pan-the-whole-photo, zoom-in, aspect-locked crop interaction
+// Instagram/Facebook/Twitter/LinkedIn all use. Its own percentage-based
+// crop output (onCropComplete's first argument, and
+// initialCroppedAreaPercentages for reloading a saved crop) is exactly
+// the ImageCropRect shape stored here — no lossy conversion in either
+// direction.
 
 import type { CSSProperties } from "react";
 
@@ -19,9 +20,27 @@ export const IMAGE_FOCUS_SQUARE_TAG_PREFIX = "image_focus_square:";
 
 export type ImageCropRect = { x: number; y: number; width: number; height: number };
 
-// The whole image, uncropped — matches react-easy-crop's own "nothing
-// selected yet" state (crop {x:0,y:0}, zoom 1, objectFit "contain").
+// The whole image, uncropped — the "nothing set yet" sentinel. It's the
+// image's own full frame, which usually has a different aspect ratio than
+// whatever fixed aspect (16:9, 1:1, ...) a crop tool locks to, so it's
+// never meaningful to seed a Cropper's initialCroppedAreaPercentages with
+// this — see isDefaultCrop().
 export const DEFAULT_IMAGE_CROP: ImageCropRect = { x: 0, y: 0, width: 100, height: 100 };
+
+// True when no real crop has been saved yet. A Cropper locked to a fixed
+// aspect ratio can't be seeded with "the whole image" as its initial crop
+// unless the source image happens to already be that exact aspect ratio —
+// forcing it to reconcile an aspect-incompatible 100%-of-image rectangle
+// against a locked aspect produces a broken initial pan position (the
+// image renders offset, overflowing its container). Skip seeding entirely
+// in this case and let the library compute its own correct default for
+// the locked aspect instead.
+export function isDefaultCrop(crop: ImageCropRect): boolean {
+  return crop.x === DEFAULT_IMAGE_CROP.x
+    && crop.y === DEFAULT_IMAGE_CROP.y
+    && crop.width === DEFAULT_IMAGE_CROP.width
+    && crop.height === DEFAULT_IMAGE_CROP.height;
+}
 
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) return 0;

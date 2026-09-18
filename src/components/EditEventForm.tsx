@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import AdminImageSelectorModal from 'src/components/admin/AdminImageSelectorModal';
-import EventImageCropper from 'src/components/admin/EventImageCropper';
+import EventImageCropModal from 'src/components/admin/EventImageCropModal';
 import { supabase } from 'src/lib/supabaseClient';
 import type { Database } from 'types/supabase';
 import {
@@ -18,6 +18,7 @@ import {
 } from 'src/lib/eventTypeConfig';
 import {
   buildImageCropTag,
+  cropRectImageStyle,
   DEFAULT_IMAGE_CROP,
   IMAGE_FOCUS_COVER_TAG_PREFIX,
   IMAGE_FOCUS_SQUARE_TAG_PREFIX,
@@ -296,6 +297,7 @@ export default function EditEventForm({
   const [showSquareImageSelector, setShowSquareImageSelector] = useState(false);
   const [imageCropCover, setImageCropCover] = useState<ImageCropRect>(DEFAULT_IMAGE_CROP);
   const [imageCropSquare, setImageCropSquare] = useState<ImageCropRect>(DEFAULT_IMAGE_CROP);
+  const [cropModalTarget, setCropModalTarget] = useState<'cover' | 'square' | null>(null);
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
     normalizeEventTypeConfig(defaultEventTypeConfig)
   );
@@ -1485,28 +1487,55 @@ export default function EditEventForm({
                       Crop
                     </p>
                     <div className="grid gap-4 md:grid-cols-2">
-                      <EventImageCropper
-                        imageUrl={eventData.image_url}
-                        value={imageCropCover}
-                        onChange={setImageCropCover}
-                        aspect={16 / 9}
-                        aspectClassName="aspect-video"
-                        label="Cover / widescreen (16:9)"
-                        usedOn="the Up Next card on the events page"
-                      />
-                      <EventImageCropper
-                        imageUrl={eventData.image_url_square || eventData.image_url}
-                        value={imageCropSquare}
-                        onChange={setImageCropSquare}
-                        aspect={1}
-                        aspectClassName="aspect-square"
-                        label={
-                          eventData.image_url_square
-                            ? 'Square image (1:1)'
-                            : 'Square / profile (1:1) — cropped from featured image'
-                        }
-                        usedOn="the Featured grid, event list thumbnails, and the event detail page"
-                      />
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-700">Cover / widescreen (16:9)</p>
+                          <p className="text-[11px] text-gray-500">Used on: the Up Next card on the events page</p>
+                        </div>
+                        <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-gray-900">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
+                          <img
+                            src={eventData.image_url}
+                            alt="Cover crop preview"
+                            style={cropRectImageStyle(imageCropCover)}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCropModalTarget('cover')}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Edit crop
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-700">
+                            {eventData.image_url_square
+                              ? 'Square image (1:1)'
+                              : 'Square / profile (1:1) — cropped from featured image'}
+                          </p>
+                          <p className="text-[11px] text-gray-500">
+                            Used on: the Featured grid, event list thumbnails, and the event detail page
+                          </p>
+                        </div>
+                        <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-900">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
+                          <img
+                            src={eventData.image_url_square || eventData.image_url}
+                            alt="Square crop preview"
+                            style={cropRectImageStyle(imageCropSquare)}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCropModalTarget('square')}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Edit crop
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : null}
@@ -1629,6 +1658,28 @@ export default function EditEventForm({
           }))
         }
       />
+
+      {cropModalTarget === 'cover' && (
+        <EventImageCropModal
+          imageUrl={eventData.image_url}
+          initialCrop={imageCropCover}
+          aspect={16 / 9}
+          title="Crop cover image (16:9)"
+          onSave={setImageCropCover}
+          onClose={() => setCropModalTarget(null)}
+        />
+      )}
+
+      {cropModalTarget === 'square' && (
+        <EventImageCropModal
+          imageUrl={eventData.image_url_square || eventData.image_url}
+          initialCrop={imageCropSquare}
+          aspect={1}
+          title="Crop square image (1:1)"
+          onSave={setImageCropSquare}
+          onClose={() => setCropModalTarget(null)}
+        />
+      )}
 
       {showOverrideModal && (
         <>
