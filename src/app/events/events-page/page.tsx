@@ -277,7 +277,7 @@ export default function Page() {
                             className="overflow-hidden transition-transform duration-300 group-hover:!rotate-0 group-hover:-translate-y-1.5 bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)]"
                             style={{ transform: `rotate(var(${CARD_TILT_VARS[i % CARD_TILT_VARS.length]}))` }}
                           >
-                            <div className="relative w-full aspect-video">
+                            <div className="relative w-full aspect-video overflow-hidden">
                               {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                               <img src={img} alt={displayTitle} style={cropRectImageStyle(coverCrop)} />
                             </div>
@@ -331,7 +331,7 @@ export default function Page() {
                           className="block group"
                         >
                           <div className="overflow-hidden flex flex-col transition-all duration-200 group-hover:-translate-y-1 bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] rounded-lg">
-                            <div className="relative w-full pt-[100%]">
+                            <div className="relative w-full pt-[100%] overflow-hidden">
                               {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                               <img src={img} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
                             </div>

@@ -222,7 +222,7 @@ export default function Page() {
             <div
               className="text-center overflow-hidden bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)] -rotate-[0.6deg]"
             >
-              <div className="relative aspect-square w-full">
+              <div className="relative aspect-square w-full overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                 <img src={imageSrc} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
               </div>
