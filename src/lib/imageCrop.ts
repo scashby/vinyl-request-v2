@@ -33,8 +33,12 @@ export type ImageFocus = { x: number; y: number; zoom: number };
 // the frame's background around the photo; above 1 crops in tighter.
 export const DEFAULT_IMAGE_FOCUS: ImageFocus = { x: 50, y: 50, zoom: 1 };
 
-const MIN_ZOOM = 0.4;
-const MAX_ZOOM = 3;
+// 0.4 let a photo shrink to a near-invisible sliver surrounded by dead
+// frame background — real zoom-out, but past the point of looking like a
+// deliberate choice rather than a broken state. 0.6 keeps genuine
+// zoom-out (and its letterboxing) while stopping short of that.
+export const MIN_ZOOM = 0.6;
+export const MAX_ZOOM = 3;
 
 export function clampFocusPercent(value: number): number {
   if (!Number.isFinite(value)) return 50;

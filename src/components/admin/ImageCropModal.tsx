@@ -16,6 +16,8 @@ import {
   coerceImageFocus,
   DEFAULT_IMAGE_FOCUS,
   imageFocusStyle,
+  MAX_ZOOM,
+  MIN_ZOOM,
   type ImageFocus,
 } from "src/lib/imageCrop";
 
@@ -152,8 +154,8 @@ export default function ImageCropModal({
             <span className="text-xs text-gray-500 shrink-0">Zoom</span>
             <input
               type="range"
-              min={0.4}
-              max={3}
+              min={MIN_ZOOM}
+              max={MAX_ZOOM}
               step={0.05}
               value={focus.zoom}
               onChange={(e) => setFocus({ ...focus, zoom: clampFocusZoom(Number.parseFloat(e.target.value)) })}
