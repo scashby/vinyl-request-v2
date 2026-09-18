@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import AdminImageSelectorModal from 'src/components/admin/AdminImageSelectorModal';
-import ImageCropModal from 'src/components/admin/ImageCropModal';
+import EventImageCropModal from 'src/components/admin/EventImageCropModal';
 import { supabase } from 'src/lib/supabaseClient';
 import type { Database } from 'types/supabase';
 import {
@@ -17,13 +17,13 @@ import {
   mergeEventTypeConfig,
 } from 'src/lib/eventTypeConfig';
 import {
-  buildImageFocusTag,
-  DEFAULT_IMAGE_FOCUS,
+  buildImageCropTag,
+  cropRectImageStyle,
+  DEFAULT_IMAGE_CROP,
   IMAGE_FOCUS_COVER_TAG_PREFIX,
   IMAGE_FOCUS_SQUARE_TAG_PREFIX,
-  imageFocusStyle,
-  parseImageFocusTag,
-  type ImageFocus,
+  parseImageCropTag,
+  type ImageCropRect,
 } from 'src/lib/imageCrop';
 
 const EVENT_TYPE_SETTINGS_KEY = 'event_type_config';
@@ -295,8 +295,8 @@ export default function EditEventForm({
   const [isRegeneratingChildren, setIsRegeneratingChildren] = useState(false);
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [showSquareImageSelector, setShowSquareImageSelector] = useState(false);
-  const [imageCropCover, setImageCropCover] = useState<ImageFocus>(DEFAULT_IMAGE_FOCUS);
-  const [imageCropSquare, setImageCropSquare] = useState<ImageFocus>(DEFAULT_IMAGE_FOCUS);
+  const [imageCropCover, setImageCropCover] = useState<ImageCropRect>(DEFAULT_IMAGE_CROP);
+  const [imageCropSquare, setImageCropSquare] = useState<ImageCropRect>(DEFAULT_IMAGE_CROP);
   const [cropModalTarget, setCropModalTarget] = useState<'cover' | 'square' | null>(null);
   const [eventTypeConfig, setEventTypeConfig] = useState<EventTypeConfigState>(() =>
     normalizeEventTypeConfig(defaultEventTypeConfig)
@@ -517,8 +517,8 @@ export default function EditEventForm({
           info_url: copiedEvent?.info_url ?? '',
           is_recurring: false
         }));
-        setImageCropCover(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
-        setImageCropSquare(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
+        setImageCropCover(parseImageCropTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
+        setImageCropSquare(parseImageCropTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
       } else if (editEventId) {
         const { data, error } = await supabase
           .from('events')
@@ -556,8 +556,8 @@ export default function EditEventForm({
             is_featured_upnext: !!dbEvent.is_featured_upnext,
             featured_priority: dbEvent.featured_priority ?? null,
           });
-          setImageCropCover(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
-          setImageCropSquare(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
+          setImageCropCover(parseImageCropTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
+          setImageCropSquare(parseImageCropTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
           
           setSeriesParentId(parentId);
           setSelectedSeriesEventId(dbEvent.id);
@@ -668,8 +668,8 @@ export default function EditEventForm({
         is_featured_upnext: !!dbEvent.is_featured_upnext,
         featured_priority: dbEvent.featured_priority ?? null,
       }));
-      setImageCropCover(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
-      setImageCropSquare(parseImageFocusTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
+      setImageCropCover(parseImageCropTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
+      setImageCropSquare(parseImageCropTag(normalizedTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX));
     }
   };
 
@@ -849,8 +849,8 @@ export default function EditEventForm({
       const allowedTags = [
         buildTag(EVENT_TYPE_TAG_PREFIX, eventData.event_type),
         buildTag(EVENT_SUBTYPE_TAG_PREFIX, eventData.event_subtype),
-        buildImageFocusTag(IMAGE_FOCUS_COVER_TAG_PREFIX, imageCropCover),
-        buildImageFocusTag(IMAGE_FOCUS_SQUARE_TAG_PREFIX, imageCropSquare),
+        buildImageCropTag(IMAGE_FOCUS_COVER_TAG_PREFIX, imageCropCover),
+        buildImageCropTag(IMAGE_FOCUS_SQUARE_TAG_PREFIX, imageCropSquare),
       ].filter(Boolean) as string[];
       const normalizedImageUrl = normalizeOptionalText(eventData.image_url);
       const normalizedImageUrlSquare = normalizeOptionalText(eventData.image_url_square);
@@ -1493,12 +1493,11 @@ export default function EditEventForm({
                           <p className="text-[11px] text-gray-500">Used on: the Up Next card on the events page</p>
                         </div>
                         <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-gray-900">
-                          {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
+                          {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                           <img
                             src={eventData.image_url}
                             alt="Cover crop preview"
-                            className="absolute inset-0 h-full w-full object-cover"
-                            style={imageFocusStyle(imageCropCover)}
+                            style={cropRectImageStyle(imageCropCover)}
                           />
                         </div>
                         <button
@@ -1522,12 +1521,11 @@ export default function EditEventForm({
                           </p>
                         </div>
                         <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-900">
-                          {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
+                          {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                           <img
                             src={eventData.image_url_square || eventData.image_url}
                             alt="Square crop preview"
-                            className="absolute inset-0 h-full w-full object-cover"
-                            style={imageFocusStyle(imageCropSquare)}
+                            style={cropRectImageStyle(imageCropSquare)}
                           />
                         </div>
                         <button
@@ -1662,10 +1660,10 @@ export default function EditEventForm({
       />
 
       {cropModalTarget === 'cover' && (
-        <ImageCropModal
+        <EventImageCropModal
           imageUrl={eventData.image_url}
-          initialFocus={imageCropCover}
-          aspectClassName="aspect-video"
+          initialCrop={imageCropCover}
+          aspect={16 / 9}
           title="Crop cover image (16:9)"
           onSave={setImageCropCover}
           onClose={() => setCropModalTarget(null)}
@@ -1673,10 +1671,10 @@ export default function EditEventForm({
       )}
 
       {cropModalTarget === 'square' && (
-        <ImageCropModal
+        <EventImageCropModal
           imageUrl={eventData.image_url_square || eventData.image_url}
-          initialFocus={imageCropSquare}
-          aspectClassName="aspect-square"
+          initialCrop={imageCropSquare}
+          aspect={1}
           title="Crop square image (1:1)"
           onSave={setImageCropSquare}
           onClose={() => setCropModalTarget(null)}

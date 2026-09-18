@@ -7,8 +7,6 @@
 // a given environment — /api/homepage-sections just fills in real (editable)
 // data on top of these once it exists.
 
-import { DEFAULT_IMAGE_FOCUS, type ImageFocus } from 'src/lib/imageCrop';
-
 export interface HeroData {
   eyebrow: string;
   headline: string; // may contain "{night}" / "{venue}" tokens
@@ -18,7 +16,6 @@ export interface HeroData {
   secondary_cta_label: string;
   secondary_cta_href: string;
   photo_url: string; // shown instead of the placeholder once set
-  photo_crop: ImageFocus; // how photo_url is framed within its (4:5) slot
   photo_placeholder_text: string; // may contain "{venue}"; shown until photo_url is set
 }
 
@@ -51,7 +48,6 @@ export interface GameDeckData {
   cta_label: string;
   cta_href: string;
   photo_url: string; // shown instead of the placeholder once set
-  photo_crop: ImageFocus; // how photo_url is framed within its (7:5) slot
   photo_placeholder_text: string; // shown until photo_url is set
 }
 
@@ -119,7 +115,6 @@ export const DEFAULT_SECTIONS: {
     secondary_cta_label: 'Book a Private Event',
     secondary_cta_href: '/about',
     photo_url: '',
-    photo_crop: DEFAULT_IMAGE_FOCUS,
     photo_placeholder_text: 'Photo coming soon — Steve at the decks, {venue}',
   },
   residency: {
@@ -151,7 +146,6 @@ export const DEFAULT_SECTIONS: {
     cta_label: 'Explore Vinyl Game Deck →',
     cta_href: 'https://vinylgamedeck.com',
     photo_url: '',
-    photo_crop: DEFAULT_IMAGE_FOCUS,
     photo_placeholder_text: 'Photo coming soon — Vinyl Bingo on a brewery table',
   },
   dialogues_teaser: {

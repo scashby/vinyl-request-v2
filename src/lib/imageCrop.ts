@@ -1,80 +1,61 @@
 // src/lib/imageCrop.ts
-// Single source of truth for the event/homepage image crop system: a
-// pan + zoom transform (focal point + scale), not a crop rectangle.
+// Single source of truth for the event image crop system: real crop
+// rectangles (x/y/width/height as percentages of the source image, not an
+// approximated anchor point + zoom factor), the tag encoding that stores
+// them, and the CSS to render a stored rectangle.
 //
-// A crop-rectangle model (a sub-region selection of the source image) was
-// tried first and rejected: it structurally cannot represent "zoom out
-// past the point where the photo fully covers the frame" — there is no
-// rectangle you can select that's *bigger* than the source image. Real
-// apps (Instagram, Facebook, Twitter, LinkedIn) don't hit that wall
-// because they don't store a rectangle at all — they store where the
-// photo is centered and how far it's scaled, exactly like this. Scaling
-// an already-covering image down via a plain CSS transform is always
-// valid at any factor; it just reveals the frame's own background around
-// the photo (real letterboxing), which is the actual, intended way to see
-// "more than fills the frame."
-//
-// Editing goes through a dedicated modal
-// (src/components/admin/ImageCropModal.tsx): drag the photo to pan,
-// scroll/slider to zoom in either direction. The rendered frame in that
-// modal uses the exact same imageFocusStyle() as every public render
-// site, so there is nothing to translate between "what you see while
-// editing" and "what ships."
+// Editing goes through react-easy-crop, opened from a dedicated modal
+// (src/components/admin/EventImageCropModal.tsx) — the same
+// pan-the-whole-photo, zoom-in, aspect-locked crop interaction
+// Instagram/Facebook/Twitter/LinkedIn all use. Its own percentage-based
+// crop output (onCropComplete's first argument, and
+// initialCroppedAreaPercentages for reloading a saved crop) is exactly
+// the ImageCropRect shape stored here — no lossy conversion in either
+// direction.
 
 import type { CSSProperties } from "react";
 
 export const IMAGE_FOCUS_COVER_TAG_PREFIX = "image_focus_cover:";
 export const IMAGE_FOCUS_SQUARE_TAG_PREFIX = "image_focus_square:";
 
-export type ImageFocus = { x: number; y: number; zoom: number };
+export type ImageCropRect = { x: number; y: number; width: number; height: number };
 
-// Centered, zoom 1 — the photo's own "cover" baseline for whatever frame
-// it's placed in, anchored at the image's center. Zooming below 1 reveals
-// the frame's background around the photo; above 1 crops in tighter.
-export const DEFAULT_IMAGE_FOCUS: ImageFocus = { x: 50, y: 50, zoom: 1 };
+// The whole image, uncropped — the "nothing set yet" sentinel. It's the
+// image's own full frame, which usually has a different aspect ratio than
+// whatever fixed aspect (16:9, 1:1, ...) a crop tool locks to, so it's
+// never meaningful to seed a Cropper's initialCroppedAreaPercentages with
+// this — see isDefaultCrop().
+export const DEFAULT_IMAGE_CROP: ImageCropRect = { x: 0, y: 0, width: 100, height: 100 };
 
-// 0.4 let a photo shrink to a near-invisible sliver surrounded by dead
-// frame background — real zoom-out, but past the point of looking like a
-// deliberate choice rather than a broken state. 0.6 keeps genuine
-// zoom-out (and its letterboxing) while stopping short of that.
-export const MIN_ZOOM = 0.6;
-export const MAX_ZOOM = 3;
+// True when no real crop has been saved yet. A Cropper locked to a fixed
+// aspect ratio can't be seeded with "the whole image" as its initial crop
+// unless the source image happens to already be that exact aspect ratio —
+// forcing it to reconcile an aspect-incompatible 100%-of-image rectangle
+// against a locked aspect produces a broken initial pan position (the
+// image renders offset, overflowing its container). Skip seeding entirely
+// in this case and let the library compute its own correct default for
+// the locked aspect instead.
+export function isDefaultCrop(crop: ImageCropRect): boolean {
+  return crop.x === DEFAULT_IMAGE_CROP.x
+    && crop.y === DEFAULT_IMAGE_CROP.y
+    && crop.width === DEFAULT_IMAGE_CROP.width
+    && crop.height === DEFAULT_IMAGE_CROP.height;
+}
 
-export function clampFocusPercent(value: number): number {
-  if (!Number.isFinite(value)) return 50;
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0;
   return Math.min(100, Math.max(0, value));
 }
 
-export function clampFocusZoom(value: number): number {
-  if (!Number.isFinite(value)) return 1;
-  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
-}
-
-export function clampImageFocus(focus: ImageFocus): ImageFocus {
+function clampCropRect(crop: ImageCropRect): ImageCropRect {
+  const x = clampPercent(crop.x);
+  const y = clampPercent(crop.y);
   return {
-    x: clampFocusPercent(focus.x),
-    y: clampFocusPercent(focus.y),
-    zoom: clampFocusZoom(focus.zoom),
+    x,
+    y,
+    width: Math.min(100 - x, Math.max(1, crop.width)),
+    height: Math.min(100 - y, Math.max(1, crop.height)),
   };
-}
-
-// Homepage sections store photo_crop as a raw object in a jsonb column
-// (not a tag string), so a photo cropped before this pan+zoom model
-// existed still has the old {x,y,width,height} shape sitting in the DB.
-// Reusing its x/y as a center point would silently misframe the photo, so
-// treat anything that isn't a complete, valid ImageFocus as unset rather
-// than partially trusting it.
-export function coerceImageFocus(value: unknown): ImageFocus {
-  if (
-    value &&
-    typeof value === "object" &&
-    Number.isFinite((value as ImageFocus).x) &&
-    Number.isFinite((value as ImageFocus).y) &&
-    Number.isFinite((value as ImageFocus).zoom)
-  ) {
-    return clampImageFocus(value as ImageFocus);
-  }
-  return DEFAULT_IMAGE_FOCUS;
 }
 
 function normalizeTags(value: unknown): string[] {
@@ -85,47 +66,57 @@ function normalizeTags(value: unknown): string[] {
   return [];
 }
 
-// Tag shape: "<prefix><x>:<y>:<zoom>". Events tagged before this model
-// existed (the earlier crop-rectangle format, "<prefix>x:y:width:height")
-// parse as "not set" — the centered, zoom-1 default — rather than guessing
-// an equivalent from a fundamentally different representation.
-export function parseImageFocusTag(tags: string[], prefix: string): ImageFocus {
+// Tag shape: "<prefix><x>:<y>:<width>:<height>", all percentages. Events
+// tagged before this crop-rectangle model existed (an anchor-point, or
+// anchor-point + zoom, format from earlier iterations) parse as "no crop
+// set" — the full image — the same as an event that's never been cropped,
+// rather than guessing at an equivalent rectangle from a different model.
+export function parseImageCropTag(tags: string[], prefix: string): ImageCropRect {
   const match = tags.find((tag) => tag.startsWith(prefix));
-  if (!match) return DEFAULT_IMAGE_FOCUS;
+  if (!match) return DEFAULT_IMAGE_CROP;
 
   const parts = match.slice(prefix.length).split(":").map(Number.parseFloat);
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return DEFAULT_IMAGE_FOCUS;
+  if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) return DEFAULT_IMAGE_CROP;
 
-  const [x, y, zoom] = parts;
-  return clampImageFocus({ x, y, zoom });
+  const [x, y, width, height] = parts;
+  return clampCropRect({ x, y, width, height });
 }
 
 // Convenience wrapper for the public render sites, which hold allowed_tags
 // as `unknown` (comes back from Supabase as string[] or a Postgres array
 // literal string depending on the query path).
-export function getImageFocusFromTags(tagsValue: unknown, prefix: string): ImageFocus {
-  return parseImageFocusTag(normalizeTags(tagsValue), prefix);
+export function getImageCropFromTags(tagsValue: unknown, prefix: string): ImageCropRect {
+  return parseImageCropTag(normalizeTags(tagsValue), prefix);
 }
 
-export function buildImageFocusTag(prefix: string, focus: ImageFocus): string {
-  const f = clampImageFocus(focus);
+export function buildImageCropTag(prefix: string, crop: ImageCropRect): string {
+  const c = clampCropRect(crop);
   const round = (n: number) => Math.round(n * 100) / 100;
-  return `${prefix}${round(f.x)}:${round(f.y)}:${round(f.zoom)}`;
+  return `${prefix}${round(c.x)}:${round(c.y)}:${round(c.width)}:${round(c.height)}`;
 }
 
-// object-position places the anchor point at zoom 1 (the photo's normal
-// cover-fit baseline); transform: scale(), anchored at that same point
-// via transform-origin, zooms in or out from there. Scaling below 1 is a
-// completely ordinary CSS operation — it reveals the frame's own
-// background around the now-smaller photo, which is exactly the
-// letterboxing a real "zoom out" should show. Used with a plain <img
-// className="object-cover">, not next/image's fill mode, so the
-// transform-origin math stays exact.
-export function imageFocusStyle(focus: ImageFocus): CSSProperties {
-  const f = coerceImageFocus(focus);
+// Renders a stored crop rectangle so it exactly fills its container: the
+// image is scaled up so the cropped rectangle alone equals 100% of the
+// container, then shifted so that rectangle's top-left corner lands at the
+// container's origin. object-fit/object-position can only express a single
+// anchor point at a fixed "cover" scale — never an arbitrary rectangle —
+// which is why this renders a plain absolutely-positioned <img> rather
+// than next/image's `fill` mode. The wrapping element needs
+// `position: relative; overflow: hidden` (every call site already has
+// this for its own card/rounded-corner styling).
+export function cropRectImageStyle(crop: ImageCropRect): CSSProperties {
+  const c = clampCropRect(crop);
+  const x0 = c.x / 100;
+  const y0 = c.y / 100;
+  const w0 = c.width / 100;
+  const h0 = c.height / 100;
+
   return {
-    objectPosition: `${f.x}% ${f.y}%`,
-    transform: f.zoom !== 1 ? `scale(${f.zoom})` : undefined,
-    transformOrigin: `${f.x}% ${f.y}%`,
+    position: "absolute",
+    left: `${-(x0 / w0) * 100}%`,
+    top: `${-(y0 / h0) * 100}%`,
+    width: `${100 / w0}%`,
+    height: `${100 / h0}%`,
+    maxWidth: "none",
   };
 }

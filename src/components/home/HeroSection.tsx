@@ -1,7 +1,7 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { Container } from 'components/ui/Container';
 import { fillTokens, type HeroData } from 'src/lib/homeContent';
-import { imageFocusStyle } from 'src/lib/imageCrop';
 
 export function HeroSection({
   data,
@@ -45,12 +45,12 @@ export function HeroSection({
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[18px] h-[18px] rounded-full bg-[var(--dwd-accent-2)] border-2 border-[var(--dwd-ink)] z-10" />
           {data.photo_url ? (
             <div className="relative w-full aspect-[4/5] overflow-hidden [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)] [transform:rotate(var(--dwd-tilt-1))]">
-              {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
-              <img
+              <Image
                 src={data.photo_url}
                 alt="Steve at the decks"
-                className="absolute inset-0 h-full w-full object-cover"
-                style={imageFocusStyle(data.photo_crop)}
+                fill
+                className="object-cover"
+                unoptimized
               />
             </div>
           ) : (
