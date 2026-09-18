@@ -458,7 +458,7 @@ export default function EditHomePage() {
           label="Photo"
           url={gameDeck.data.photo_url}
           crop={gameDeck.data.photo_crop}
-          aspectClassName="aspect-[7/5]"
+          aspectClassName="aspect-[3/4]"
           onChoose={() => setPhotoModalTarget("game_deck")}
           onEditCrop={() => setCropModalTarget("game_deck")}
           onClear={() => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_url: "", photo_crop: DEFAULT_IMAGE_CROP } })}
@@ -602,7 +602,7 @@ export default function EditHomePage() {
         <ImageCropModal
           imageUrl={gameDeck.data.photo_url}
           initialCrop={gameDeck.data.photo_crop}
-          aspect={280 / 200}
+          aspect={3 / 4}
           title="Crop Vinyl Game Deck photo"
           onSave={(crop) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_crop: crop } })}
           onClose={() => setCropModalTarget(null)}

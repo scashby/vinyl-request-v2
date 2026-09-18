@@ -49,12 +49,12 @@ export function GameDeckSection({ data }: { data: GameDeckData }) {
           )}
         </div>
         {data.photo_url ? (
-          <div className="relative w-full sm:w-[280px] h-[180px] sm:h-[200px] flex-shrink-0 overflow-hidden -rotate-[1.8deg] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]">
+          <div className="relative w-full sm:w-[220px] aspect-[3/4] flex-shrink-0 overflow-hidden -rotate-[1.8deg] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]">
             {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
             <img src={data.photo_url} alt="Vinyl Game Deck in action" style={cropRectImageStyle(data.photo_crop)} />
           </div>
         ) : (
-          <div className="w-full sm:w-[280px] h-[180px] sm:h-[200px] flex-shrink-0 flex items-center justify-center text-center p-4 -rotate-[1.8deg] bg-[var(--dwd-bg)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]">
+          <div className="w-full sm:w-[220px] aspect-[3/4] flex-shrink-0 flex items-center justify-center text-center p-4 -rotate-[1.8deg] bg-[var(--dwd-bg)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]">
             <span className="text-[13px] font-bold uppercase tracking-wider text-[var(--dwd-accent-1)]">
               {data.photo_placeholder_text}
             </span>

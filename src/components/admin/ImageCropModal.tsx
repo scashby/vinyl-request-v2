@@ -45,7 +45,13 @@ export default function ImageCropModal({
   onClose,
 }: Props) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
+  // Starting at the floor (1x) meant the slider could only ever go one
+  // direction (in) — starting at the midpoint gives room to move either
+  // way from the first interaction. Only matters for a fresh/default
+  // crop: when initialCroppedAreaPercentages (below) has a real saved
+  // crop to restore, react-easy-crop corrects this placeholder to the
+  // zoom that actually matches it via its own onZoomChange call on mount.
+  const [zoom, setZoom] = useState((MIN_ZOOM + MAX_ZOOM) / 2);
   const [result, setResult] = useState<ImageCropRect>(initialCrop);
 
   useEffect(() => {
