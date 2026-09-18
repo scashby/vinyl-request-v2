@@ -6,8 +6,8 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import Image from "next/image";
 import AdminImageSelectorModal from "src/components/admin/AdminImageSelectorModal";
+import HomePhotoCropModal from "src/components/admin/HomePhotoCropModal";
 import {
   DEFAULT_SECTIONS,
   SECTION_LABELS,
@@ -23,6 +23,7 @@ import {
   type SectionType,
   type SocialLink,
 } from "src/lib/homeContent";
+import { DEFAULT_PHOTO_FOCUS, photoFocusStyle, type PhotoFocus } from "src/lib/homePhotoFocus";
 import { DEFAULT_THEME, THEMES, isThemeName, type ThemeName } from "src/lib/theme";
 
 function ThemeSwitcher() {
@@ -123,21 +124,33 @@ function Field({
 function PhotoField({
   label,
   url,
+  focus,
+  aspectClassName,
   onChoose,
+  onEditCrop,
   onClear,
 }: {
   label: string;
   url: string;
+  focus: PhotoFocus;
+  // Must match the real destination's aspect (passed to
+  // HomePhotoCropModal's aspectClassName for the same photo) so this
+  // preview agrees with both the crop modal and the live site for the
+  // same saved framing — a generic square thumbnail would stretch a
+  // 4:5 or 7:5 photo.
+  aspectClassName: string;
   onChoose: () => void;
+  onEditCrop: () => void;
   onClear: () => void;
 }) {
   return (
     <div>
       <label className={labelClass}>{label}</label>
       <div className="flex items-center gap-3">
-        <div className="relative w-20 h-20 rounded-lg border border-gray-300 bg-gray-50 overflow-hidden shrink-0">
+        <div className={`relative w-20 ${aspectClassName} rounded-lg border border-gray-300 bg-gray-50 overflow-hidden shrink-0`}>
           {url ? (
-            <Image src={url} alt="" fill className="object-cover" unoptimized />
+            // eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly
+            <img src={url} alt="" className="absolute inset-0 h-full w-full object-cover" style={photoFocusStyle(focus)} />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 text-center px-1">
               No photo
@@ -153,13 +166,22 @@ function PhotoField({
             Choose or upload photo
           </button>
           {url && (
-            <button
-              type="button"
-              onClick={onClear}
-              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-            >
-              Clear
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={onEditCrop}
+                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Edit crop
+              </button>
+              <button
+                type="button"
+                onClick={onClear}
+                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Clear
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -232,6 +254,7 @@ export default function EditHomePage() {
   const [dialoguesTeaser, setDialoguesTeaser] = useSectionState<DialoguesTeaserData>(DEFAULT_SECTIONS.dialogues_teaser);
   const [connect, setConnect] = useSectionState<ConnectData>(DEFAULT_SECTIONS.connect);
   const [photoModalTarget, setPhotoModalTarget] = useState<"hero" | "game_deck" | null>(null);
+  const [cropModalTarget, setCropModalTarget] = useState<"hero" | "game_deck" | null>(null);
 
   useEffect(() => {
     fetch("/api/homepage-sections?page=home")
@@ -338,7 +361,10 @@ export default function EditHomePage() {
         <PhotoField
           label="Hero photo"
           url={hero.data.photo_url}
+          focus={hero.data.photo_focus}
+          aspectClassName="aspect-[4/5]"
           onChoose={() => setPhotoModalTarget("hero")}
+          onEditCrop={() => setCropModalTarget("hero")}
           onClear={() => setHero({ ...hero, data: { ...hero.data, photo_url: "" } })}
         />
         <Field
@@ -430,7 +456,10 @@ export default function EditHomePage() {
         <PhotoField
           label="Photo"
           url={gameDeck.data.photo_url}
+          focus={gameDeck.data.photo_focus}
+          aspectClassName="aspect-[7/5]"
           onChoose={() => setPhotoModalTarget("game_deck")}
+          onEditCrop={() => setCropModalTarget("game_deck")}
           onClear={() => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_url: "" } })}
         />
         <Field
@@ -539,7 +568,9 @@ export default function EditHomePage() {
         title="Select hero photo"
         selectedUrl={hero.data.photo_url}
         onClose={() => setPhotoModalTarget(null)}
-        onSelect={(publicUrl) => setHero({ ...hero, data: { ...hero.data, photo_url: publicUrl } })}
+        onSelect={(publicUrl) =>
+          setHero({ ...hero, data: { ...hero.data, photo_url: publicUrl, photo_focus: DEFAULT_PHOTO_FOCUS } })
+        }
       />
 
       <AdminImageSelectorModal
@@ -548,8 +579,32 @@ export default function EditHomePage() {
         title="Select Vinyl Game Deck photo"
         selectedUrl={gameDeck.data.photo_url}
         onClose={() => setPhotoModalTarget(null)}
-        onSelect={(publicUrl) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_url: publicUrl } })}
+        onSelect={(publicUrl) =>
+          setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_url: publicUrl, photo_focus: DEFAULT_PHOTO_FOCUS } })
+        }
       />
+
+      {cropModalTarget === "hero" && (
+        <HomePhotoCropModal
+          imageUrl={hero.data.photo_url}
+          initialFocus={hero.data.photo_focus}
+          aspectClassName="aspect-[4/5]"
+          title="Crop hero photo (4:5)"
+          onSave={(focus) => setHero({ ...hero, data: { ...hero.data, photo_focus: focus } })}
+          onClose={() => setCropModalTarget(null)}
+        />
+      )}
+
+      {cropModalTarget === "game_deck" && (
+        <HomePhotoCropModal
+          imageUrl={gameDeck.data.photo_url}
+          initialFocus={gameDeck.data.photo_focus}
+          aspectClassName="aspect-[7/5]"
+          title="Crop Vinyl Game Deck photo (7:5)"
+          onSave={(focus) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_focus: focus } })}
+          onClose={() => setCropModalTarget(null)}
+        />
+      )}
     </div>
   );
 }
