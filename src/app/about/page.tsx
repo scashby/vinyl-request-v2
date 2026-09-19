@@ -1,9 +1,18 @@
 // About page ("/about") — Database-driven content
+//
+// Data source unchanged (/api/about-content, /api/most-wanted,
+// SocialEmbeds) — still admin-editable at /admin/edit-about. This pass
+// only restyles the page to match the v2 brand (theme-aware, card
+// language shared with the homepage) — Most Wanted and the wishlist
+// links already lived here, which is why nav no longer needs a separate
+// "Browse Collection" entry.
 
 'use client'
 
-import React, { useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import SocialEmbeds from "../../components/SocialEmbeds"
+import { Container } from "components/ui/Container"
+import { useActiveTheme } from "src/lib/useActiveTheme"
 
 interface MostWantedItem {
   id: number;
@@ -38,6 +47,33 @@ interface AboutContent {
   linktree_url?: string;
 }
 
+const cardStyle = {
+  border: 'var(--dwd-card-border)',
+  borderRadius: 'var(--dwd-card-radius)',
+} as const;
+
+function PageShell({ children }: { children: React.ReactNode }) {
+  const { cssVars } = useActiveTheme();
+  return (
+    <div
+      className="min-h-screen font-[family-name:var(--dwd-font-body)] bg-[var(--dwd-bg)] text-[var(--dwd-ink)]"
+      style={cssVars}
+    >
+      <Container size="xl">
+        <div className="pt-16 pb-10 md:pt-20">
+          <div className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-4xl md:text-5xl mb-3">
+            About
+          </div>
+          <p className="text-lg text-[var(--dwd-ink-soft)] max-w-xl">
+            Bookings, favorites, and how to find the good stuff.
+          </p>
+        </div>
+      </Container>
+      {children}
+    </div>
+  );
+}
+
 export default function AboutPage() {
   const [mostWanted, setMostWanted] = useState<MostWantedItem[]>([]);
   const [aboutContent, setAboutContent] = useState<AboutContent | null>(null);
@@ -64,7 +100,7 @@ export default function AboutPage() {
       } catch (error) {
         console.error("Error fetching about content:", error);
       }
-      
+
       setLoading(false);
     };
 
@@ -73,149 +109,125 @@ export default function AboutPage() {
 
   if (loading) {
     return (
-      <div className="bg-white min-h-screen">
-        <header className="relative w-full h-[300px] flex items-center justify-center bg-[url('/images/event-header-still.jpg')] bg-cover bg-center">
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-8">
-            <h1 className="font-serif-display text-4xl md:text-5xl font-bold text-white text-center m-0">About</h1>
-          </div>
-        </header>
-        <main className="container-responsive py-12">
-          <div className="text-center p-12 text-lg text-gray-600">
-            Loading...
-          </div>
-        </main>
-      </div>
+      <PageShell>
+        <Container size="xl">
+          <div className="text-center py-16 text-lg text-[var(--dwd-ink-faint)]">Loading&hellip;</div>
+        </Container>
+      </PageShell>
     );
   }
 
   if (!aboutContent) {
     return (
-      <div className="bg-white min-h-screen">
-        <header className="relative w-full h-[300px] flex items-center justify-center bg-[url('/images/event-header-still.jpg')] bg-cover bg-center">
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-8">
-            <h1 className="font-serif-display text-4xl md:text-5xl font-bold text-white text-center m-0">About</h1>
-          </div>
-        </header>
-        <main className="container-responsive py-12">
-          <div className="text-center p-12 text-lg text-gray-600">
+      <PageShell>
+        <Container size="xl">
+          <div className="text-center py-16 text-lg text-[var(--dwd-ink-faint)]">
             Content not available. Please contact the administrator.
           </div>
-        </main>
-      </div>
+        </Container>
+      </PageShell>
     );
   }
 
   return (
-    <div className="bg-white min-h-screen">
-      <header className="relative w-full h-[300px] flex items-center justify-center bg-[url('/images/event-header-still.jpg')] bg-cover bg-center">
-        <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-8">
-          <h1 className="font-serif-display text-4xl md:text-5xl font-bold text-white text-center m-0">About</h1>
-        </div>
-      </header>
-      
-      <main className="container-responsive py-12">
-        <div className="flex flex-col lg:flex-row gap-12 items-start">
+    <PageShell>
+      <Container size="xl">
+        <div className="flex flex-col lg:flex-row gap-12 items-start pb-20">
           {/* Main Content Column */}
           <div className="flex-1 lg:flex-[2] min-w-0">
-            <div className="pr-0 lg:pr-4">
-              <h2 className="text-3xl font-bold text-purple-900 mb-6">About Dead Wax Dialogues</h2>
-              <div className="prose max-w-none text-gray-800 mb-8 space-y-4">
-                {aboutContent.main_description && aboutContent.main_description.split('\n\n').map((paragraph, index) => (
-                  <p key={index} className="text-lg leading-relaxed">{paragraph}</p>
-                ))}
+            <div className="prose max-w-none mb-8 space-y-4">
+              {aboutContent.main_description && aboutContent.main_description.split('\n\n').map((paragraph, index) => (
+                <p key={index} className="text-lg leading-relaxed text-[var(--dwd-ink)]">{paragraph}</p>
+              ))}
+            </div>
+
+            {/* Booking Information Section */}
+            <div
+              className="bg-[var(--dwd-bg-card)] p-6 md:p-8 my-8"
+              style={{ ...cardStyle, boxShadow: 'var(--dwd-card-shadow)' }}
+            >
+              <div className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-2xl mb-4 text-center">
+                Book Dead Wax Dialogues
               </div>
 
-              {/* Booking Information Section */}
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 md:p-8 my-8">
-                <h3 className="text-2xl font-bold text-gray-800 mb-4 text-center">
-                  Book Dead Wax Dialogues
-                </h3>
-                
-                <p className="text-lg text-gray-600 text-center mb-8 leading-relaxed max-w-3xl mx-auto">
-                  {aboutContent.booking_description}
-                </p>
+              <p className="text-lg text-[var(--dwd-ink-soft)] text-center mb-8 leading-relaxed max-w-3xl mx-auto">
+                {aboutContent.booking_description}
+              </p>
 
-                {/* Book Online Button */}
-                <div className="text-center mb-10">
-                  <a 
-                    href={aboutContent.calendly_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block bg-blue-600 hover:bg-blue-700 text-white py-3 px-8 rounded-lg text-lg font-semibold shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-                  >
-                    📅 Schedule a Consultation
-                  </a>
+              {/* Book Online Button */}
+              <div className="text-center mb-10">
+                <a
+                  href={aboutContent.calendly_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block bg-[var(--dwd-accent-1)] hover:bg-[var(--dwd-accent-1-hover)] text-[var(--dwd-bg)] py-3 px-8 rounded-full text-lg font-bold transition-colors"
+                >
+                  Schedule a Consultation
+                </a>
+              </div>
+
+              {/* Services Grid */}
+              {aboutContent.services && aboutContent.services.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                  {aboutContent.services.map((service, index) => (
+                    <div
+                      key={index}
+                      className="bg-[var(--dwd-bg)] p-6"
+                      style={cardStyle}
+                    >
+                      <div className="text-xl font-bold mb-2">{service.title}</div>
+                      <p className="text-[var(--dwd-ink-soft)] mb-4 leading-relaxed">{service.description}</p>
+                      <div className="text-lg font-bold text-[var(--dwd-accent-1)]">{service.price}</div>
+                    </div>
+                  ))}
                 </div>
+              )}
 
-                {/* Services Grid */}
-                {aboutContent.services && aboutContent.services.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                    {aboutContent.services.map((service, index) => (
-                      <div key={index} className="bg-white border border-gray-200 rounded-lg p-6">
-                        <h4 className="text-xl font-bold text-gray-800 mb-2">
-                          {service.title}
-                        </h4>
-                        <p className="text-gray-600 mb-4 leading-relaxed">
-                          {service.description}
+              {/* Testimonials */}
+              {aboutContent.testimonials && aboutContent.testimonials.length > 0 && (
+                <div className="mb-10">
+                  <div className="text-xl font-bold mb-6 text-center">What People Say</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {aboutContent.testimonials.map((testimonial, index) => (
+                      <div
+                        key={index}
+                        className="bg-[var(--dwd-bg)] p-6 border-l-4"
+                        style={{ ...cardStyle, borderLeftColor: 'var(--dwd-accent-1)' }}
+                      >
+                        <p className="italic text-[var(--dwd-ink-soft)] mb-3 leading-relaxed">
+                          &ldquo;{testimonial.text}&rdquo;
                         </p>
-                        <div className="text-lg font-bold text-blue-600">
-                          {service.price}
-                        </div>
+                        <div className="text-sm font-bold text-[var(--dwd-accent-1)]">— {testimonial.author}</div>
                       </div>
                     ))}
                   </div>
-                )}
-
-                {/* Testimonials */}
-                {aboutContent.testimonials && aboutContent.testimonials.length > 0 && (
-                  <div className="mb-10">
-                    <h4 className="text-xl font-bold text-gray-800 mb-6 text-center">
-                      What People Say
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {aboutContent.testimonials.map((testimonial, index) => (
-                        <div key={index} className="bg-white border border-gray-200 rounded-lg p-6 border-l-4 border-l-blue-600">
-                          <p className="italic text-gray-600 mb-3 leading-relaxed">
-                            &ldquo;{testimonial.text}&rdquo;
-                          </p>
-                          <div className="text-sm font-bold text-blue-600">
-                            — {testimonial.author}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Contact Information */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
-                  <h4 className="text-xl font-bold text-gray-800 mb-4">
-                    Contact Information
-                  </h4>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                    <div>
-                      <strong className="block text-gray-900">{aboutContent.contact_name}</strong>
-                      <span className="text-gray-500">{aboutContent.contact_company}</span>
-                    </div>
-                    <div>
-                      <a href={`mailto:${aboutContent.contact_email}`} className="text-blue-600 hover:underline">
-                        {aboutContent.contact_email}
-                      </a>
-                    </div>
-                    <div>
-                      <a href={`tel:${aboutContent.contact_phone}`} className="text-blue-600 hover:underline">
-                        {aboutContent.contact_phone}
-                      </a>
-                    </div>
-                  </div>
-
-                  {aboutContent.booking_notes && (
-                    <div className="text-sm text-gray-500 italic">
-                      {aboutContent.booking_notes}
-                    </div>
-                  )}
                 </div>
+              )}
+
+              {/* Contact Information */}
+              <div className="bg-[var(--dwd-bg)] p-6 text-center" style={cardStyle}>
+                <div className="text-xl font-bold mb-4">Contact Information</div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <strong className="block">{aboutContent.contact_name}</strong>
+                    <span className="text-[var(--dwd-ink-faint)]">{aboutContent.contact_company}</span>
+                  </div>
+                  <div>
+                    <a href={`mailto:${aboutContent.contact_email}`} className="text-[var(--dwd-accent-1)] hover:underline">
+                      {aboutContent.contact_email}
+                    </a>
+                  </div>
+                  <div>
+                    <a href={`tel:${aboutContent.contact_phone}`} className="text-[var(--dwd-accent-1)] hover:underline">
+                      {aboutContent.contact_phone}
+                    </a>
+                  </div>
+                </div>
+
+                {aboutContent.booking_notes && (
+                  <div className="text-sm text-[var(--dwd-ink-faint)] italic">{aboutContent.booking_notes}</div>
+                )}
               </div>
             </div>
           </div>
@@ -223,33 +235,39 @@ export default function AboutPage() {
           {/* Sidebar */}
           <aside className="flex-1 min-w-[280px] w-full lg:w-auto pt-2">
             <div className="mb-8">
-              <div className="font-bold text-lg text-orange-600 mb-3 border-b border-gray-200 pb-2">Top 10 Most Wanted</div>
-              <ol className="list-decimal pl-5 space-y-2 text-gray-800">
-                {mostWanted.map((item) => (
+              <div className="font-bold text-lg text-[var(--dwd-accent-2)] mb-3 border-b border-[var(--dwd-ink)]/10 pb-2">
+                Top 10 Most Wanted
+              </div>
+              <ol className="list-decimal pl-5 space-y-2">
+                {mostWanted.filter((item) => item.title && item.url).map((item) => (
                   <li key={item.id}>
-                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:underline font-medium">
+                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-[var(--dwd-accent-1)] hover:underline font-medium">
                       {item.title}
                     </a>
                   </li>
                 ))}
               </ol>
             </div>
-            
+
             <div className="mb-8">
-              <div className="font-bold text-lg text-orange-600 mb-3 border-b border-gray-200 pb-2">Wish List</div>
+              <div className="font-bold text-lg text-[var(--dwd-accent-2)] mb-3 border-b border-[var(--dwd-ink)]/10 pb-2">
+                Wish List
+              </div>
               <div className="flex flex-col gap-2">
-                <a href={aboutContent.amazon_wishlist_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-2">
-                  <span>🛒</span> Full Amazon Wish List
+                <a href={aboutContent.amazon_wishlist_url} target="_blank" rel="noopener noreferrer" className="text-[var(--dwd-accent-1)] hover:underline">
+                  Full Amazon Wish List
                 </a>
-                <a href={aboutContent.discogs_wantlist_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-2">
-                  <span>💿</span> Full Discogs Wantlist
+                <a href={aboutContent.discogs_wantlist_url} target="_blank" rel="noopener noreferrer" className="text-[var(--dwd-accent-1)] hover:underline">
+                  Full Discogs Wantlist
                 </a>
               </div>
             </div>
 
             {/* Social Feed */}
             <div className="mb-8">
-              <div className="font-bold text-lg text-orange-600 mb-3 border-b border-gray-200 pb-2">Recent Social Posts</div>
+              <div className="font-bold text-lg text-[var(--dwd-accent-2)] mb-3 border-b border-[var(--dwd-ink)]/10 pb-2">
+                Recent Social Posts
+              </div>
               <div className="space-y-6">
                 <SocialEmbeds />
                 <div className="mt-6">
@@ -257,7 +275,7 @@ export default function AboutPage() {
                     href={aboutContent.linktree_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block w-full text-center bg-black hover:bg-gray-800 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+                    className="block w-full text-center bg-[var(--dwd-ink)] hover:opacity-90 text-[var(--dwd-bg)] font-bold py-3 px-4 rounded-full transition-opacity"
                   >
                     Visit Our Linktree
                   </a>
@@ -266,8 +284,8 @@ export default function AboutPage() {
             </div>
           </aside>
         </div>
-      </main>
-    </div>
+      </Container>
+    </PageShell>
   )
 }
-// AUDIT: inspected, no changes.
+// AUDIT: restyled for v2 brand (theme-aware, shared card language); data source unchanged.

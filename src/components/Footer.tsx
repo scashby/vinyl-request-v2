@@ -1,76 +1,65 @@
-import {
-  SiDiscogs,
-  SiFacebook,
-  SiInstagram,
-  SiThreads,
-  SiBluesky,
-  SiSubstack,
-} from "react-icons/si";
-import { FiMail } from "react-icons/fi";
+"use client";
 
-const socials = [
-  {
-    name: "Discogs",
-    url: "https://www.discogs.com/user/socialblunders/collection",
-    icon: <SiDiscogs size="18" color="#222" />,
-  },
-  {
-    name: "Email",
-    url: "mailto:steve@deadwaxdialogues.com",
-    icon: <FiMail size="18" color="#222" />,
-  },
-  {
-    name: "Facebook",
-    url: "https://www.facebook.com/profile.php?id=61576451743378",
-    icon: <SiFacebook size="18" color="#222" />,
-  },
-  {
-    name: "Instagram",
-    url: "https://www.instagram.com/deadwaxdialogues/",
-    icon: <SiInstagram size="18" color="#222" />,
-  },
-  {
-    name: "Threads",
-    url: "https://www.threads.net/@deadwaxdialogues",
-    icon: <SiThreads size="18" color="#222" />,
-  },
-  {
-    name: "Bluesky",
-    url: "https://bsky.app/profile/deadwaxdialogues.bsky.social",
-    icon: <SiBluesky size="18" color="#222" />,
-  },
-  {
-    name: "Substack",
-    url: "https://deadwaxdialogues.substack.com",
-    icon: <SiSubstack size="18" color="#222" />,
-  },
-];
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { getSocialIcon } from "src/lib/socialIcons";
+import { DEFAULT_SECTIONS, type ConnectData, type HomepageSection } from "src/lib/homeContent";
+import { useActiveTheme } from "src/lib/useActiveTheme";
+
+// Email is a fixed footer utility link, not part of the editable "socials"
+// list (which is shared with the homepage Connect section via
+// /admin/edit-home) — it's always appended last.
+const EMAIL_LINK = { name: "Email", url: "mailto:steve@deadwaxdialogues.com" };
 
 export default function Footer() {
+  const pathname = usePathname();
+  const [connectData, setConnectData] = useState<ConnectData>(DEFAULT_SECTIONS.connect);
+  const { cssVars } = useActiveTheme();
+
+  useEffect(() => {
+    fetch("/api/homepage-sections?page=home")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((rows: HomepageSection<Partial<ConnectData>>[]) => {
+        const connectRow = rows.find((r) => r.section_type === "connect");
+        if (connectRow) setConnectData({ ...DEFAULT_SECTIONS.connect, ...connectRow.data });
+      })
+      .catch((err) => console.error("Error loading footer social links:", err));
+  }, []);
+
+  if (pathname?.startsWith("/admin") || pathname?.startsWith("/edit-collection")) {
+    return null;
+  }
+
+  const links = [...connectData.socials, EMAIL_LINK];
+
   return (
-    <footer className="bg-[#f3f3f3] text-[#222] text-[15px] w-full border-t border-[#e2e2e2] min-h-[36px] relative">
-      {/* Absolutely positioned right-side icon row */}
-      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2.5 z-[2]">
-        {socials.map((s) => (
-          <a
-            key={s.name}
-            href={s.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={s.name}
-            className="opacity-[0.68] transition-opacity duration-200 hover:opacity-100"
-          >
-            {s.icon}
-          </a>
-        ))}
-      </div>
-      {/* Centered copyright */}
-      <div className="max-w-[1140px] mx-auto h-[36px] flex items-center justify-center relative z-[1]">
-        <span className="w-full text-center font-normal tracking-wide text-[#222]">
+    <footer
+      className="bg-[var(--dwd-nav-bg)] text-[var(--dwd-ink)] w-full border-t border-[var(--dwd-ink)]/10"
+      style={cssVars}
+    >
+      <div className="container-responsive py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <span className="text-sm tracking-wide text-[var(--dwd-ink)]/70 order-2 sm:order-1">
           &copy; {new Date().getFullYear()} Dead Wax Dialogues
         </span>
+        <div className="flex gap-2.5 order-1 sm:order-2">
+          {links.map(({ name, url }) => {
+            const Icon = getSocialIcon(name);
+            return (
+              <a
+                key={name}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={name}
+                className="w-9 h-9 rounded-full bg-[var(--dwd-ink)]/5 flex items-center justify-center text-[var(--dwd-ink)]/70 transition-colors duration-200 hover:bg-[var(--dwd-ink)] hover:text-[var(--dwd-bg)]"
+              >
+                <Icon size={16} />
+              </a>
+            );
+          })}
+        </div>
       </div>
     </footer>
   );
 }
-// AUDIT: inspected, no changes.
+// AUDIT: restyled for v2 brand palette; renders site-wide, self-hides on admin/edit-collection routes, pulls social links from the shared homepage content model, and is now theme-aware via src/lib/theme.ts.

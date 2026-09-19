@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "src/lib/supabaseAdmin";
 import { gameBlueprints, type GameStatus } from "src/lib/gameBlueprints";
+import { getResolvedGameBlueprint } from "src/lib/resolveGameBlueprints";
 
 export const runtime = "nodejs";
 
@@ -10,18 +11,20 @@ type PatchBody = {
   title?: unknown;
   status?: unknown;
   notes?: unknown;
-  pullSizeGuidance?: unknown;
+  tagline?: unknown;
 };
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const blueprint = gameBlueprints.find((game) => game.slug === slug);
-  if (!blueprint) return NextResponse.json({ error: "Game not found" }, { status: 404 });
+  // A slug is editable whether it's a static blueprint or a purely
+  // admin-added custom game — getResolvedGameBlueprint covers both.
+  const game = await getResolvedGameBlueprint(slug);
+  if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
 
   const body = (await request.json().catch(() => ({}))) as PatchBody;
 
-  const override: Record<string, string> = {};
+  const override: Record<string, string | boolean> = {};
 
   if (typeof body.title === "string" && body.title.trim()) {
     override.title = body.title.trim();
@@ -32,22 +35,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (body.notes !== undefined) {
     override.notes = typeof body.notes === "string" ? body.notes.trim() : "";
   }
-  if (typeof body.pullSizeGuidance === "string") {
-    override.pullSizeGuidance = body.pullSizeGuidance.trim();
+  if (body.tagline !== undefined) {
+    override.tagline = typeof body.tagline === "string" ? body.tagline.trim() : "";
   }
 
   if (Object.keys(override).length === 0) {
     return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
   }
 
-  // Read existing override and merge
+  const isCustom = !gameBlueprints.some((g) => g.slug === slug);
+  if (isCustom) override.isCustom = true;
+
   const { data: existing } = await supabaseAdmin
     .from("admin_settings")
     .select("value")
     .eq("key", `game:blueprint:${slug}`)
     .maybeSingle();
 
-  const existingOverride = existing?.value ? (JSON.parse(existing.value as string) as Record<string, string>) : {};
+  const existingOverride = existing?.value ? (JSON.parse(existing.value as string) as Record<string, string | boolean>) : {};
   const merged = { ...existingOverride, ...override };
 
   const { error } = await supabaseAdmin
@@ -62,8 +67,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const blueprint = gameBlueprints.find((game) => game.slug === slug);
-  if (!blueprint) return NextResponse.json({ error: "Game not found" }, { status: 404 });
+  const game = await getResolvedGameBlueprint(slug);
+  if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
 
   const { error } = await supabaseAdmin
     .from("admin_settings")

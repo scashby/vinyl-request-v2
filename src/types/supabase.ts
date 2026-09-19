@@ -3475,6 +3475,7 @@ export type Database = {
           has_queue: boolean | null
           id: number
           image_url: string | null
+          image_url_square: string | null
           info: string | null
           info_url: string | null
           is_featured_grid: boolean | null
@@ -3497,6 +3498,7 @@ export type Database = {
           has_queue?: boolean | null
           id?: never
           image_url?: string | null
+          image_url_square?: string | null
           info?: string | null
           info_url?: string | null
           is_featured_grid?: boolean | null
@@ -3519,6 +3521,7 @@ export type Database = {
           has_queue?: boolean | null
           id?: never
           image_url?: string | null
+          image_url_square?: string | null
           info?: string | null
           info_url?: string | null
           is_featured_grid?: boolean | null
@@ -4038,6 +4041,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      homepage_sections: {
+        Row: {
+          created_at: string
+          data: Json
+          id: number
+          page: string
+          position: number
+          section_type: string
+          updated_at: string
+          visible: boolean
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: never
+          page?: string
+          position?: number
+          section_type: string
+          updated_at?: string
+          visible?: boolean
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: never
+          page?: string
+          position?: number
+          section_type?: string
+          updated_at?: string
+          visible?: boolean
+        }
+        Relationships: []
       }
       image_assets: {
         Row: {

@@ -15,8 +15,6 @@ interface Event {
   date: string;
   is_recurring?: boolean;
   parent_event_id?: number | null;
-  crate_id?: number | null;
-  has_queue?: boolean;
   is_featured_grid?: boolean;
   featured_priority?: number | null;
   allowed_tags?: string[] | string | null;
@@ -53,20 +51,11 @@ const getTagValue = (tags: string[], prefix: string): string => {
 
 export default function Page() {
   const [events, setEvents] = useState<Event[]>([]);
-  const [crates, setCrates] = useState<Record<number, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter();
 
   useEffect(() => {
     async function fetchData() {
-      // Fetch Crates Map
-      const { data: cratesData } = await supabase.from('crates').select('id, name');
-      if (cratesData) {
-        const crateMap: Record<number, string> = {};
-        cratesData.forEach(c => crateMap[c.id] = c.name);
-        setCrates(crateMap);
-      }
-
       // Fetch Events
       const { data: eventsData, error } = await supabase
         .from('events')
@@ -87,50 +76,9 @@ export default function Page() {
     setEvents((prev) => prev.map((ev) => (ev.id === eventId ? { ...ev, ...updates } : ev)));
     // Only include keys that are valid Event fields
     const validKeys = [
-      'date', 'title', 'time', 'location', 'image_url', 'venue_logo_url', 'info', 'info_url',
-      'has_queue', 'queue_types', 'allowed_formats', 'allowed_tags', 'crate_id', 'is_featured_grid',
-      'is_featured_upnext', 'featured_priority', 'is_recurring', 'parent_event_id', 'created_at',
-      'event_id', 'playlist_id', 'status', 'notes', 'event_type', 'event_subtype', 'event_source',
-      'event_source_id', 'event_source_url', 'event_source_payload', 'event_payload', 'event_tags',
-      'event_flags', 'event_metadata', 'event_notes', 'venue_id', 'venue_name', 'venue_address',
-      'venue_city', 'venue_state', 'venue_zip', 'venue_country', 'venue_lat', 'venue_lng',
-      'venue_info', 'venue_url', 'venue_logo_url', 'venue_logo', 'venue_logo_alt', 'venue_logo_caption',
-      'venue_logo_credit', 'venue_logo_credit_url', 'venue_logo_source', 'venue_logo_source_url',
-      'venue_logo_source_payload', 'venue_logo_metadata', 'venue_logo_notes', 'venue_logo_tags',
-      'venue_logo_flags', 'venue_logo_created_at', 'venue_logo_updated_at', 'venue_logo_archived',
-      'venue_logo_archived_at', 'venue_logo_archived_by', 'venue_logo_archived_reason', 'venue_logo_archived_notes',
-      'venue_logo_archived_source', 'venue_logo_archived_source_url', 'venue_logo_archived_source_payload',
-      'venue_logo_archived_metadata', 'venue_logo_archived_tags', 'venue_logo_archived_flags',
-      'venue_logo_archived_created_at', 'venue_logo_archived_updated_at', 'venue_logo_archived_archived_at',
-      'venue_logo_archived_archived_by', 'venue_logo_archived_archived_reason', 'venue_logo_archived_archived_notes',
-      'venue_logo_archived_archived_source', 'venue_logo_archived_archived_source_url',
-      'venue_logo_archived_archived_source_payload', 'venue_logo_archived_archived_metadata',
-      'venue_logo_archived_archived_tags', 'venue_logo_archived_archived_flags', 'venue_logo_archived_archived_created_at',
-      'venue_logo_archived_archived_updated_at', 'venue_logo_archived_archived_archived_at',
-      'venue_logo_archived_archived_archived_by', 'venue_logo_archived_archived_archived_reason',
-      'venue_logo_archived_archived_archived_notes', 'venue_logo_archived_archived_archived_source',
-      'venue_logo_archived_archived_archived_source_url', 'venue_logo_archived_archived_archived_source_payload',
-      'venue_logo_archived_archived_archived_metadata', 'venue_logo_archived_archived_archived_tags',
-      'venue_logo_archived_archived_archived_flags', 'venue_logo_archived_archived_archived_created_at',
-      'venue_logo_archived_archived_archived_updated_at', 'venue_logo_archived_archived_archived_archived_at',
-      'venue_logo_archived_archived_archived_archived_by', 'venue_logo_archived_archived_archived_archived_reason',
-      'venue_logo_archived_archived_archived_archived_notes', 'venue_logo_archived_archived_archived_archived_source',
-      'venue_logo_archived_archived_archived_archived_source_url', 'venue_logo_archived_archived_archived_archived_source_payload',
-      'venue_logo_archived_archived_archived_archived_metadata', 'venue_logo_archived_archived_archived_archived_tags',
-      'venue_logo_archived_archived_archived_archived_flags', 'venue_logo_archived_archived_archived_archived_created_at',
-      'venue_logo_archived_archived_archived_archived_updated_at', 'venue_logo_archived_archived_archived_archived_archived_at',
-      'venue_logo_archived_archived_archived_archived_archived_by', 'venue_logo_archived_archived_archived_archived_archived_reason',
-      'venue_logo_archived_archived_archived_archived_archived_notes', 'venue_logo_archived_archived_archived_archived_archived_source',
-      'venue_logo_archived_archived_archived_archived_archived_source_url', 'venue_logo_archived_archived_archived_archived_archived_source_payload',
-      'venue_logo_archived_archived_archived_archived_archived_metadata', 'venue_logo_archived_archived_archived_archived_archived_tags',
-      'venue_logo_archived_archived_archived_archived_archived_flags', 'venue_logo_archived_archived_archived_archived_archived_created_at',
-      'venue_logo_archived_archived_archived_archived_archived_updated_at', 'venue_logo_archived_archived_archived_archived_archived_archived_at',
-      'venue_logo_archived_archived_archived_archived_archived_archived_by', 'venue_logo_archived_archived_archived_archived_archived_archived_reason',
-      'venue_logo_archived_archived_archived_archived_archived_archived_notes', 'venue_logo_archived_archived_archived_archived_archived_archived_source',
-      'venue_logo_archived_archived_archived_archived_archived_archived_source_url', 'venue_logo_archived_archived_archived_archived_archived_archived_source_payload',
-      'venue_logo_archived_archived_archived_archived_archived_archived_metadata', 'venue_logo_archived_archived_archived_archived_archived_archived_tags',
-      'venue_logo_archived_archived_archived_archived_archived_archived_flags', 'venue_logo_archived_archived_archived_archived_archived_archived_created_at',
-      'venue_logo_archived_archived_archived_archived_archived_archived_updated_at'
+      'date', 'title', 'time', 'location', 'image_url', 'info', 'info_url',
+      'allowed_tags', 'is_featured_grid', 'is_featured_upnext', 'featured_priority',
+      'is_recurring', 'parent_event_id',
     ];
     // Normalize allowed_tags to always be a string[] or remove it BEFORE filtering
     const normalized = { ...updates };
@@ -284,16 +232,6 @@ export default function Page() {
                     {eventSubtype && (
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700 bg-indigo-100 px-2 py-1 rounded-full">
                         {eventSubtypeLabels[eventSubtype] || eventSubtype}
-                      </span>
-                    )}
-                    {event.crate_id && crates[event.crate_id] && (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded-full">
-                        📦 {crates[event.crate_id]}
-                      </span>
-                    )}
-                    {event.has_queue && (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 bg-purple-100 px-2 py-1 rounded-full">
-                        Queue Active
                       </span>
                     )}
                   </div>

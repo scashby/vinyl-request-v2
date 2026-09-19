@@ -21,7 +21,7 @@ export const gameBlueprints: GameBlueprint[] = [
   {
     slug: "bingo",
     title: "Music Bingo",
-    status: "in_development",
+    status: "in_production",
     coreMechanic: "Spin records and verify matches against printed cards.",
     setup: "Playlist/deck source, card generation, and 2+ teams.",
     pullSizeGuidance: "Call deck target: planned calls + 10-15% spares (example: 75 calls -> pull 84-90 records).",
