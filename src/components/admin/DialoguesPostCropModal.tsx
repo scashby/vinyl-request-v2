@@ -32,6 +32,12 @@ type Props = {
   onClose: () => void;
 };
 
+// The crop frame sits inset within a slightly larger "stage" that shares
+// its aspect ratio (equal insets on every side preserve that), so the
+// parts of the photo currently cropped out are still visible — dimmed,
+// via the frame's own giant-spread box-shadow — instead of simply gone.
+const FRAME_INSET_STYLE = { inset: "15%" };
+
 export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, onSave, onClose }: Props) {
   const [focus, setFocus] = useState<PostFocus>(() => coercePostFocus(initialFocus));
   const [isDragging, setIsDragging] = useState(false);
@@ -117,21 +123,40 @@ export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, 
         </div>
 
         <div className="p-6">
-          <div
-            ref={frameRef}
-            onPointerDown={handlePointerDown}
-            className={`relative w-full aspect-[3/2] overflow-hidden rounded-lg bg-gray-100 select-none touch-none ${
-              isDragging ? "cursor-grabbing" : "cursor-grab"
-            }`}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
-            <img
-              src={imageUrl}
-              alt={`${title} preview`}
-              draggable={false}
-              className="absolute inset-0 h-full w-full pointer-events-none"
-              style={postFocusStyle(focus)}
-            />
+          {/* The outer box is the "stage" — bigger than the actual crop
+              frame (FRAME_INSET_STYLE insets it) so the parts of the photo
+              currently cropped OUT are still visible, dimmed, around it —
+              the only way to actually see how close a pan/zoom is to the
+              visible frame's edges instead of guessing. */}
+          <div className="relative w-full aspect-[3/2] overflow-hidden rounded-lg bg-gray-100 select-none touch-none">
+            <div className="absolute overflow-visible pointer-events-none" style={FRAME_INSET_STYLE}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
+              <img
+                src={imageUrl}
+                alt=""
+                aria-hidden="true"
+                draggable={false}
+                className="absolute inset-0 h-full w-full"
+                style={postFocusStyle(focus)}
+              />
+            </div>
+            <div
+              ref={frameRef}
+              onPointerDown={handlePointerDown}
+              className={`absolute overflow-hidden rounded border-2 border-white bg-gray-100 shadow-[0_0_0_9999px_rgba(17,24,39,0.6)] ${
+                isDragging ? "cursor-grabbing" : "cursor-grab"
+              }`}
+              style={FRAME_INSET_STYLE}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
+              <img
+                src={imageUrl}
+                alt={`${title} preview`}
+                draggable={false}
+                className="absolute inset-0 h-full w-full pointer-events-none"
+                style={postFocusStyle(focus)}
+              />
+            </div>
           </div>
 
           <div className="mt-4 flex items-center gap-3">

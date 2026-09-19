@@ -19,7 +19,13 @@ export type PostFocus = { x: number; y: number; zoom: number };
 
 export const DEFAULT_POST_FOCUS: PostFocus = { x: 50, y: 50, zoom: 1 };
 
-export const MIN_POST_ZOOM = 1;
+// 0.6, not 1 — real zoom-out (with real letterboxing, via the same
+// transform: scale() this already uses for zoom-in) must always be
+// possible, and the default must never sit at the slider's own floor.
+// This exact mistake (min == default == hard-left) was already made and
+// fixed once for the Hero/Game Deck tool; it must not recur here or on
+// any future crop tool in this codebase.
+export const MIN_POST_ZOOM = 0.6;
 export const MAX_POST_ZOOM = 3;
 
 function clampPercent(value: number): number {
