@@ -4,12 +4,14 @@ import Link from "next/link";
 import { existsSync } from "fs";
 import { join } from "path";
 import { Container } from "components/ui/Container";
-import { gameBlueprints, type GameBlueprint } from "src/lib/gameBlueprints";
+import { getResolvedGameBlueprint } from "src/lib/resolveGameBlueprints";
 import { publicCopyBySlug } from "src/lib/gamePublicCopy";
 import { getActiveTheme, toCssVars } from "src/lib/getActiveThemeServer";
 import type { CSSProperties } from "react";
 
 export const runtime = "nodejs";
+// See src/app/games/page.tsx for why this must stay dynamic.
+export const dynamic = "force-dynamic";
 
 function resolveLogoPath(slug: string): string | null {
   for (const ext of ["svg", "png", "jpg", "webp"]) {
@@ -27,22 +29,17 @@ function resolveLogoPath(slug: string): string | null {
   return null;
 }
 
-function loadGame(slug: string): GameBlueprint | null {
-  return gameBlueprints.find((g) => g.slug === slug) ?? null;
-}
-
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const game = loadGame(slug);
+  const game = await getResolvedGameBlueprint(slug);
   if (!game) return { title: "Game Not Found" };
-  const copy = publicCopyBySlug[slug];
   return {
     title: game.title,
-    description: copy?.tagline ?? game.coreMechanic,
+    description: game.tagline || game.coreMechanic || undefined,
   };
 }
 
@@ -52,7 +49,7 @@ export default async function GamePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const game = loadGame(slug);
+  const game = await getResolvedGameBlueprint(slug);
 
   if (
     !game ||
@@ -61,6 +58,10 @@ export default async function GamePage({
     notFound();
   }
 
+  // Rich, hand-written copy (playerExperience, whatYouDo, exampleRound,
+  // etc.) still comes from the static file for the games that have it —
+  // admin-added games start with just a title/status/tagline and can get
+  // this fuller write-up added later without it blocking the listing.
   const publicCopy = publicCopyBySlug[slug];
   const logoPath = resolveLogoPath(slug);
   const isProduction = game.status === "in_production";
@@ -113,9 +114,9 @@ export default async function GamePage({
               <h1 className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-3xl md:text-5xl">
                 {game.title}
               </h1>
-              {publicCopy?.tagline ? (
+              {game.tagline ? (
                 <p className="mt-2 text-[var(--dwd-ink-soft)] text-base md:text-lg leading-relaxed max-w-2xl">
-                  {publicCopy.tagline}
+                  {game.tagline}
                 </p>
               ) : null}
             </div>
@@ -142,7 +143,7 @@ export default async function GamePage({
                   What it is
                 </div>
                 <p className="text-[var(--dwd-ink-soft)] leading-relaxed">
-                  {publicCopy?.playerExperience ?? game.coreMechanic}
+                  {publicCopy?.playerExperience || game.coreMechanic || game.tagline || "More details coming soon."}
                 </p>
                 {game.notes ? (
                   <p className="mt-4 text-sm text-[var(--dwd-ink-faint)] leading-relaxed">
@@ -276,12 +277,14 @@ export default async function GamePage({
                         </dd>
                       </div>
                     ) : null}
-                    <div>
-                      <dt className="font-semibold text-[var(--dwd-ink)]">Why it works</dt>
-                      <dd className="mt-1 text-[var(--dwd-ink-soft)] leading-relaxed">
-                        {game.whyItWorks}
-                      </dd>
-                    </div>
+                    {game.whyItWorks ? (
+                      <div>
+                        <dt className="font-semibold text-[var(--dwd-ink)]">Why it works</dt>
+                        <dd className="mt-1 text-[var(--dwd-ink-soft)] leading-relaxed">
+                          {game.whyItWorks}
+                        </dd>
+                      </div>
+                    ) : null}
                     {game.notes ? (
                       <div>
                         <dt className="font-semibold text-[var(--dwd-ink)]">Note</dt>

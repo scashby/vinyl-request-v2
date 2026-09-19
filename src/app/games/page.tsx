@@ -3,12 +3,17 @@ import Link from "next/link";
 import { existsSync } from "fs";
 import { join } from "path";
 import { Container } from "components/ui/Container";
-import { gameBlueprints, type GameBlueprint } from "src/lib/gameBlueprints";
-import { publicCopyBySlug } from "src/lib/gamePublicCopy";
+import { getResolvedGameBlueprints, type ResolvedGame } from "src/lib/resolveGameBlueprints";
+import type { GameStatus } from "src/lib/gameBlueprints";
 import { getActiveTheme, toCssVars } from "src/lib/getActiveThemeServer";
 import type { CSSProperties } from "react";
 
 export const runtime = "nodejs";
+// Without this, Next.js prerenders this page once at build time and bakes
+// in whatever games/statuses existed then — admin edits (now backed by a
+// live Supabase read in resolveGameBlueprints) wouldn't show up until the
+// next deploy.
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Games",
@@ -16,15 +21,11 @@ export const metadata = {
     "A vinyl-first catalog of Dead Wax Dialogues games: what they are and how to play.",
 };
 
-type PublicGame = GameBlueprint & {
-  tagline?: string;
+type PublicGame = ResolvedGame & {
   logoPath: string | null;
 };
 
-const ALLOWED_PUBLIC_STATUSES: GameBlueprint["status"][] = [
-  "in_production",
-  "in_development",
-];
+const ALLOWED_PUBLIC_STATUSES: GameStatus[] = ["in_production", "in_development"];
 
 function resolveLogoPath(slug: string): string | null {
   for (const ext of ["svg", "png", "jpg", "webp"]) {
@@ -42,14 +43,14 @@ function resolveLogoPath(slug: string): string | null {
   return null;
 }
 
-function loadPublicGames(): PublicGame[] {
-  return gameBlueprints
-    .map((blueprint) => ({
-      ...blueprint,
-      tagline: publicCopyBySlug[blueprint.slug]?.tagline,
-      logoPath: resolveLogoPath(blueprint.slug),
-    }))
-    .filter((game) => ALLOWED_PUBLIC_STATUSES.includes(game.status));
+async function loadPublicGames(): Promise<PublicGame[]> {
+  const games = await getResolvedGameBlueprints();
+  return games
+    .filter((game) => ALLOWED_PUBLIC_STATUSES.includes(game.status))
+    .map((game) => ({
+      ...game,
+      logoPath: resolveLogoPath(game.slug),
+    }));
 }
 
 const CARD_TILT_VARS = ["--dwd-tilt-1", "--dwd-tilt-2", "--dwd-tilt-3", "--dwd-tilt-4"];
@@ -96,7 +97,7 @@ function GameTile({ game, tilt }: { game: PublicGame; tilt: string }) {
         </div>
 
         <p className="text-sm text-[var(--dwd-ink-soft)] leading-relaxed flex-1">
-          {game.tagline ?? game.coreMechanic}
+          {game.tagline || game.coreMechanic || "More details coming soon."}
         </p>
 
         <div className="mt-4 flex items-center text-xs font-semibold text-[var(--dwd-accent-1)] group-hover:text-[var(--dwd-accent-1-hover)] transition-colors">
@@ -121,7 +122,7 @@ function GameTile({ game, tilt }: { game: PublicGame; tilt: string }) {
 }
 
 export default async function GamesPage() {
-  const publicGames = loadPublicGames();
+  const publicGames = await loadPublicGames();
 
   const productionGames = publicGames
     .filter((game) => game.status === "in_production")

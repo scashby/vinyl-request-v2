@@ -18,7 +18,7 @@ const SITE_PAGE_LINKS: PageLink[] = [
   { label: "🧩 Event Types", path: "/admin/event-types" },
   { label: "🖼️ Image Library", path: "/admin/image-library" },
   { label: "🎧 DJ Sets", path: "/admin/manage-dj-sets" },
-  { label: "🎮 Games", path: "/admin/games" },
+  { label: "🎮 Games", path: "/admin/edit-games" },
   { label: "🏠 Home Page", path: "/admin/edit-home" },
   { label: "📄 About Page", path: "/admin/edit-about" },
   { label: "🛍️ Merch Page", path: "/admin/edit-merch" },

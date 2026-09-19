@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { supabase } from 'lib/supabaseClient';
 
 interface DashboardStats {
-  totalAlbums: number;
   totalEvents: number;
   upcomingEvents: number;
 }
@@ -21,7 +20,6 @@ interface DashboardEvent {
 }
 
 interface DbTestResults {
-  inventory: 'pending' | 'success' | 'error';
   events: 'pending' | 'success' | 'error';
 }
 
@@ -29,7 +27,6 @@ type AuthStatus = 'checking' | 'authenticated' | 'unauthenticated' | 'error';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
-    totalAlbums: 0,
     totalEvents: 0,
     upcomingEvents: 0
   });
@@ -37,7 +34,6 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
   const [dbTestResults, setDbTestResults] = useState<DbTestResults>({
-    inventory: 'pending',
     events: 'pending'
   });
 
@@ -60,15 +56,7 @@ export default function AdminDashboardPage() {
         setAuthStatus('unauthenticated');
       }
 
-      const dbTests: DbTestResults = { inventory: 'pending', events: 'pending' };
-
-      try {
-        await supabase.from('inventory').select('id', { count: 'exact', head: true }).limit(1);
-        dbTests.inventory = 'success';
-      } catch (error) {
-        dbTests.inventory = 'error';
-        console.error('Inventory DB test failed:', error);
-      }
+      const dbTests: DbTestResults = { events: 'pending' };
 
       try {
         await supabase.from('events').select('id', { count: 'exact', head: true }).limit(1);
@@ -80,7 +68,6 @@ export default function AdminDashboardPage() {
 
       setDbTestResults(dbTests);
 
-      const { count: albumCount } = await supabase.from('inventory').select('id', { count: 'exact', head: true });
       const { count: totalEventsCount } = await supabase.from('events').select('id', { count: 'exact', head: true });
 
       const today = new Date().toISOString().split('T')[0];
@@ -95,7 +82,6 @@ export default function AdminDashboardPage() {
         .limit(10000);
 
       setStats({
-        totalAlbums: albumCount || 0,
         totalEvents: totalEventsCount || 0,
         upcomingEvents: upcomingCount || 0
       });
@@ -147,9 +133,6 @@ export default function AdminDashboardPage() {
           <div style={{ padding: 12, background: authStatus === 'authenticated' ? '#f0fdf4' : '#fef2f2', borderRadius: 6, border: `1px solid ${authStatus === 'authenticated' ? '#22c55e' : '#ef4444'}` }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: authStatus === 'authenticated' ? '#15803d' : '#dc2626' }}>{authStatus === 'authenticated' ? '✅ Authentication' : '❌ Auth Error'}</div>
           </div>
-          <div style={{ padding: 12, background: dbTestResults.inventory === 'success' ? '#f0fdf4' : '#fef2f2', borderRadius: 6, border: `1px solid ${dbTestResults.inventory === 'success' ? '#22c55e' : '#ef4444'}` }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: dbTestResults.inventory === 'success' ? '#15803d' : '#dc2626' }}>{dbTestResults.inventory === 'success' ? '✅ Inventory DB' : '❌ Inventory DB'}</div>
-          </div>
           <div style={{ padding: 12, background: dbTestResults.events === 'success' ? '#f0fdf4' : '#fef2f2', borderRadius: 6, border: `1px solid ${dbTestResults.events === 'success' ? '#22c55e' : '#ef4444'}` }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: dbTestResults.events === 'success' ? '#15803d' : '#dc2626' }}>{dbTestResults.events === 'success' ? '✅ Events DB' : '❌ Events DB'}</div>
           </div>
@@ -158,10 +141,6 @@ export default function AdminDashboardPage() {
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20, marginBottom: 32 }}>
-        <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: 24, borderRadius: 12 }}>
-          <div style={{ fontSize: 32, fontWeight: 'bold' }}>{stats.totalAlbums.toLocaleString()}</div>
-          <div style={{ opacity: 0.9, fontSize: 14 }}>Total Albums</div>
-        </div>
         <div style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white', padding: 24, borderRadius: 12 }}>
           <div style={{ fontSize: 32, fontWeight: 'bold' }}>{stats.upcomingEvents}</div>
           <div style={{ opacity: 0.9, fontSize: 14 }}>Upcoming Events</div>
@@ -188,7 +167,7 @@ export default function AdminDashboardPage() {
               {authStatus === 'authenticated' ? (
                 <>
                   <Link href="/admin/manage-events" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #10b981, #047857)' }}>📅 Manage Events</Link>
-                  <Link href="/admin/games" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>🎮 Games</Link>
+                  <Link href="/admin/edit-games" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>🎮 Games</Link>
                 </>
               ) : (
                 <Link href="/admin/login" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #dc2626, #b91c1c)' }}>🔑 Login Required</Link>
