@@ -2,11 +2,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import { Container } from "components/ui/Container";
 import { useActiveTheme } from "src/lib/useActiveTheme";
 import { getSocialIcon } from "src/lib/socialIcons";
 import { DEFAULT_SECTIONS, type ConnectData, type HomepageSection } from "src/lib/homeContent";
+import { postFocusStyle } from "src/lib/dialoguesPostFocus";
 
 interface DialoguesIntroData {
   heading: string;
@@ -38,6 +38,7 @@ interface BlogPost {
   "content:encoded"?: string;
   categories?: string[];
   featuredImageUrl?: string | null;
+  postFocus?: { x: number; y: number; zoom: number } | null;
 }
 
 const CARD_TILT_VARS = ["--dwd-tilt-1", "--dwd-tilt-2", "--dwd-tilt-3", "--dwd-tilt-4"];
@@ -143,14 +144,13 @@ export default function DialoguesPage() {
               <div
                 className="overflow-hidden mb-10 flex flex-col md:flex-row bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)]"
               >
-                <div className="md:w-1/2 md:self-start relative aspect-[4/3]">
-                  <Image
+                <div className="md:w-1/2 md:self-start relative aspect-[4/3] overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
+                  <img
                     src={extractFirstImg(featured) || "/images/coverplaceholder.png"}
                     alt={featured.title}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                    priority
+                    className="absolute inset-0 h-full w-full"
+                    style={postFocusStyle(featured.postFocus)}
                   />
                 </div>
                 <div className="p-8 md:w-1/2 flex flex-col justify-center">
@@ -197,13 +197,13 @@ export default function DialoguesPage() {
                     rel="noopener noreferrer"
                     className="flex flex-col h-full"
                   >
-                    <div className="relative h-48 w-full">
-                      <Image
+                    <div className="relative h-48 w-full overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
+                      <img
                         src={extractFirstImg(post) || "/images/coverplaceholder.png"}
                         alt={post.title}
-                        fill
-                        className="object-cover"
-                        unoptimized
+                        className="absolute inset-0 h-full w-full"
+                        style={postFocusStyle(post.postFocus)}
                       />
                     </div>
                     <div className="p-5 flex flex-col flex-1">

@@ -1,7 +1,33 @@
 import Parser from 'rss-parser';
 import { NextResponse } from 'next/server';
+import { supabaseAdmin } from 'src/lib/supabaseAdmin';
+import { keyForPostLink, type PostFocus } from 'src/lib/dialoguesPostFocus';
 
 const BLOG_ORIGIN = 'https://blog.deadwaxdialogues.com';
+const POST_FOCUS_KEY_PREFIX = 'dialogues:post-focus:';
+
+// Per-post pan/zoom overrides saved from /admin/edit-dialogues, keyed by a
+// hash of the post's own permalink (see src/lib/dialoguesPostFocus.ts).
+async function fetchPostFocusByLink(): Promise<Map<string, PostFocus>> {
+  const lookup = new Map<string, PostFocus>();
+  try {
+    const { data: rows } = await supabaseAdmin
+      .from('admin_settings')
+      .select('key, value')
+      .like('key', `${POST_FOCUS_KEY_PREFIX}%`);
+    for (const row of rows ?? []) {
+      const key = (row.key as string).slice(POST_FOCUS_KEY_PREFIX.length);
+      try {
+        lookup.set(key, JSON.parse(row.value as string) as PostFocus);
+      } catch {
+        // Skip malformed rows.
+      }
+    }
+  } catch {
+    // Supabase being unreachable shouldn't break the feed.
+  }
+  return lookup;
+}
 
 type FeaturedMediaLookup = Map<string, string>;
 
@@ -47,9 +73,10 @@ export async function GET() {
   });
 
   try {
-    const [feed, featuredMediaByLink] = await Promise.all([
+    const [feed, featuredMediaByLink, postFocusByKey] = await Promise.all([
       parser.parseURL(FEED_URL),
       fetchFeaturedMediaByLink(),
+      fetchPostFocusByLink(),
     ]);
 
     feed.items.forEach((item) => {
@@ -59,6 +86,7 @@ export async function GET() {
     const items = feed.items.map((item) => ({
       ...item,
       featuredImageUrl: (item.link && featuredMediaByLink.get(item.link)) || null,
+      postFocus: item.link ? postFocusByKey.get(keyForPostLink(item.link)) ?? null : null,
     }));
 
     return NextResponse.json({ items }, {

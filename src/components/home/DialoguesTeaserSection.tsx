@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Container } from 'components/ui/Container';
 import type { DialoguesTeaserData } from 'src/lib/homeContent';
+import { postFocusStyle } from 'src/lib/dialoguesPostFocus';
 
 interface BlogPost {
   title: string;
@@ -10,6 +11,7 @@ interface BlogPost {
   content?: string;
   'content:encoded'?: string;
   featuredImageUrl?: string | null;
+  postFocus?: { x: number; y: number; zoom: number } | null;
 }
 
 const CARD_TILT_VARS = ['--dwd-tilt-1', '--dwd-tilt-2', '--dwd-tilt-3', '--dwd-tilt-4'];
@@ -55,10 +57,17 @@ export function DialoguesTeaserSection({
               className="group block bg-[var(--dwd-bg-card)] overflow-hidden transition-transform duration-150 hover:!rotate-0 hover:-translate-y-1 [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)]"
               style={{ transform: `rotate(var(${CARD_TILT_VARS[i % CARD_TILT_VARS.length]}))` }}
             >
-              <div
-                className="h-[150px] bg-[var(--dwd-accent-3)] opacity-60 bg-cover bg-center"
-                style={extractFirstImg(post) ? { backgroundImage: `url(${extractFirstImg(post)})`, opacity: 1 } : undefined}
-              />
+              <div className="relative h-[150px] overflow-hidden bg-[var(--dwd-accent-3)]">
+                {extractFirstImg(post) ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly
+                  <img
+                    src={extractFirstImg(post) as string}
+                    alt=""
+                    className="absolute inset-0 h-full w-full"
+                    style={postFocusStyle(post.postFocus)}
+                  />
+                ) : null}
+              </div>
               <div className="p-5">
                 <div className="text-base font-bold mb-2 leading-snug line-clamp-2 text-[var(--dwd-ink)]">{post.title}</div>
                 <div className="text-sm text-[var(--dwd-ink-faint)] leading-relaxed line-clamp-3">

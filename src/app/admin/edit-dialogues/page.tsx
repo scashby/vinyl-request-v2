@@ -1,13 +1,32 @@
 // src/app/admin/edit-dialogues/page.tsx - Admin interface for editing Dialogues page content
 //
 // Same homepage_sections table as /admin/edit-home, scoped to page='dialogues'.
-// See sql/create-dialogues-sections.sql. The blog posts themselves come live
-// from WordPress (src/app/api/wordpress) and aren't editable here — this is
-// just the page's own header and sidebar copy.
+// See sql/create-dialogues-sections.sql. The blog posts' title/text come
+// live from WordPress and aren't editable here, but each post's card image
+// crop/pan/zoom IS editable below (src/lib/dialoguesPostFocus.ts) — that's
+// display behavior this site controls, not blog content.
 
 "use client";
 
 import { useEffect, useState } from "react";
+import DialoguesPostCropModal from "src/components/admin/DialoguesPostCropModal";
+import { postFocusStyle, type PostFocus } from "src/lib/dialoguesPostFocus";
+
+interface BlogPostSummary {
+  title: string;
+  link: string;
+  featuredImageUrl?: string | null;
+  postFocus?: PostFocus | null;
+  content?: string;
+  "content:encoded"?: string;
+}
+
+function extractFirstImg(post: BlogPostSummary): string | null {
+  if (post.featuredImageUrl) return post.featuredImageUrl;
+  const html = post["content:encoded"] || post.content || "";
+  const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
+  return match ? match[1] : null;
+}
 
 interface DialoguesIntroData {
   heading: string;
@@ -47,6 +66,9 @@ export default function EditDialoguesPage() {
   const [savingSidebar, setSavingSidebar] = useState(false);
   const [savedIntro, setSavedIntro] = useState(false);
   const [savedSidebar, setSavedSidebar] = useState(false);
+  const [posts, setPosts] = useState<BlogPostSummary[] | null>(null);
+  const [postsError, setPostsError] = useState<string | null>(null);
+  const [croppingPost, setCroppingPost] = useState<BlogPostSummary | null>(null);
 
   useEffect(() => {
     fetch("/api/homepage-sections?page=dialogues")
@@ -73,6 +95,29 @@ export default function EditDialoguesPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetch("/api/wordpress")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!Array.isArray(data.items)) return;
+        setPosts(data.items.slice(0, 9) as BlogPostSummary[]);
+      })
+      .catch(() => setPostsError("Could not load posts."));
+  }, []);
+
+  const savePostFocus = async (post: BlogPostSummary, focus: PostFocus) => {
+    try {
+      await fetch("/api/admin/dialogues-post-focus", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ link: post.link, x: focus.x, y: focus.y, zoom: focus.zoom }),
+      });
+      setPosts((prev) => prev?.map((p) => (p.link === post.link ? { ...p, postFocus: focus } : p)) ?? prev);
+    } catch (err) {
+      console.error("Error saving post image crop:", err);
+    }
+  };
 
   const saveIntro = async () => {
     if (!intro.id) return;
@@ -198,6 +243,67 @@ export default function EditDialoguesPage() {
           {savedSidebar && <span className="text-sm text-green-600 font-medium">Saved</span>}
         </div>
       </div>
+
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Post Images</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Drag and zoom each post&rsquo;s card image to control exactly how it&rsquo;s framed on the Dialogues page
+          and the homepage teaser — the post&rsquo;s title and text still come from the blog, but the crop is
+          controlled here.
+        </p>
+
+        {postsError ? (
+          <p className="text-sm text-red-600">{postsError}</p>
+        ) : !posts ? (
+          <p className="text-sm text-gray-500">Loading…</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {posts.map((post) => {
+              const imgUrl = extractFirstImg(post);
+              return (
+                <div key={post.link} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="relative w-full aspect-[3/2] bg-gray-100 overflow-hidden">
+                    {imgUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly
+                      <img
+                        src={imgUrl}
+                        alt=""
+                        className="absolute inset-0 h-full w-full"
+                        style={postFocusStyle(post.postFocus)}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+                        No image
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className="text-xs font-semibold text-gray-900 line-clamp-2 mb-2">{post.title}</p>
+                    <button
+                      type="button"
+                      onClick={() => setCroppingPost(post)}
+                      disabled={!imgUrl}
+                      className="w-full rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Edit crop
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {croppingPost && extractFirstImg(croppingPost) && (
+        <DialoguesPostCropModal
+          imageUrl={extractFirstImg(croppingPost) as string}
+          title={croppingPost.title}
+          initialFocus={croppingPost.postFocus}
+          onSave={(focus) => savePostFocus(croppingPost, focus)}
+          onClose={() => setCroppingPost(null)}
+        />
+      )}
     </div>
   );
 }
