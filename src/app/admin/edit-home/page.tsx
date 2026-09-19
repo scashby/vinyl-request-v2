@@ -590,7 +590,11 @@ export default function EditHomePage() {
           initialFocus={hero.data.photo_focus}
           aspectClassName="aspect-[4/5]"
           title="Crop hero photo (4:5)"
-          onSave={(focus) => setHero({ ...hero, data: { ...hero.data, photo_focus: focus } })}
+          onSave={(focus) => {
+            const next = { ...hero, data: { ...hero.data, photo_focus: focus } };
+            setHero(next);
+            save("hero", next);
+          }}
           onClose={() => setCropModalTarget(null)}
         />
       )}
@@ -601,7 +605,11 @@ export default function EditHomePage() {
           initialFocus={gameDeck.data.photo_focus}
           aspectClassName="aspect-[7/5]"
           title="Crop Vinyl Game Deck photo (7:5)"
-          onSave={(focus) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_focus: focus } })}
+          onSave={(focus) => {
+            const next = { ...gameDeck, data: { ...gameDeck.data, photo_focus: focus } };
+            setGameDeck(next);
+            save("game_deck", next);
+          }}
           onClose={() => setCropModalTarget(null)}
         />
       )}
