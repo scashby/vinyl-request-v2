@@ -32,10 +32,14 @@ type Props = {
   onClose: () => void;
 };
 
-// The crop frame sits inset within a slightly larger "stage" that shares
-// its aspect ratio (equal insets on every side preserve that), so the
-// parts of the photo currently cropped out are still visible — dimmed,
-// via the frame's own giant-spread box-shadow — instead of simply gone.
+// The crop frame sits inset within a slightly larger "stage". The stage's
+// background is the WHOLE photo, statically object-fit: contain'd — not
+// transformed by the current pan/zoom at all — so the area outside the
+// frame always shows real, complete image content, at every zoom level,
+// instead of going blank when nothing currently overflows the frame, and
+// instead of panning/zooming in lockstep with the frame (which would just
+// show a shifted sliver of the same crop, not the rest of the photo).
+// The frame's own box-shadow dims everything outside it as a spotlight.
 const FRAME_INSET_STYLE = { inset: "15%" };
 
 export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, onSave, onClose }: Props) {
@@ -123,23 +127,21 @@ export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, 
         </div>
 
         <div className="p-6">
-          {/* The outer box is the "stage" — bigger than the actual crop
-              frame (FRAME_INSET_STYLE insets it) so the parts of the photo
-              currently cropped OUT are still visible, dimmed, around it —
-              the only way to actually see how close a pan/zoom is to the
-              visible frame's edges instead of guessing. */}
+          {/* The background is the whole photo, statically contained —
+              never panned, zoomed, or clipped — so what's outside the
+              frame is always the real rest of the image, not blank space
+              and not a shifted copy of the same crop. The frame on top
+              is the only part driven by focus/zoom, and it alone decides
+              what actually ships (see postFocusStyle). */}
           <div className="relative w-full aspect-[4/3] overflow-hidden rounded-lg bg-gray-100 select-none touch-none">
-            <div className="absolute overflow-visible pointer-events-none" style={FRAME_INSET_STYLE}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
-              <img
-                src={imageUrl}
-                alt=""
-                aria-hidden="true"
-                draggable={false}
-                className="absolute inset-0 h-full w-full"
-                style={postFocusStyle(focus)}
-              />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element -- needs to sit under the pan/zoom frame at the same stacking level as the raw <img> it dims against */}
+            <img
+              src={imageUrl}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="absolute inset-0 h-full w-full object-contain pointer-events-none"
+            />
             <div
               ref={frameRef}
               onPointerDown={handlePointerDown}
