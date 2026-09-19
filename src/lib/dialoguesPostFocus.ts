@@ -19,12 +19,13 @@ export type PostFocus = { x: number; y: number; zoom: number };
 
 export const DEFAULT_POST_FOCUS: PostFocus = { x: 50, y: 50, zoom: 1 };
 
-// 0.6, not 1 — real zoom-out (with real letterboxing, via the same
-// transform: scale() this already uses for zoom-in) must always be
-// possible, and the default must never sit at the slider's own floor.
-// This exact mistake (min == default == hard-left) was already made and
-// fixed once for the Hero/Game Deck tool; it must not recur here or on
-// any future crop tool in this codebase.
+// Real zoom in AND out, same as every other crop tool in this codebase —
+// confirmed explicitly, more than once. The crop frame (bordered, white)
+// is the visible area; the dimmed stage around it is the "bleed" — the
+// part of the photo that's cropped off, not displayed — and zooming out
+// is what lets you see how much of the photo sits in that bleed area
+// before deciding how to frame it. Do not narrow this range based on a
+// guess about what "bleed" means; ask if it's ever unclear again.
 export const MIN_POST_ZOOM = 0.6;
 export const MAX_POST_ZOOM = 3;
 
