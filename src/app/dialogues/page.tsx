@@ -143,7 +143,7 @@ export default function DialoguesPage() {
               <div
                 className="overflow-hidden mb-10 flex flex-col md:flex-row bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)]"
               >
-                <div className="md:w-1/2 relative h-64 md:h-auto">
+                <div className="md:w-1/2 md:self-start relative aspect-[4/3]">
                   <Image
                     src={extractFirstImg(featured) || "/images/coverplaceholder.png"}
                     alt={featured.title}
