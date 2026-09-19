@@ -9,11 +9,17 @@ interface BlogPost {
   contentSnippet?: string;
   content?: string;
   'content:encoded'?: string;
+  featuredImageUrl?: string | null;
 }
 
 const CARD_TILT_VARS = ['--dwd-tilt-1', '--dwd-tilt-2', '--dwd-tilt-3', '--dwd-tilt-4'];
 
+// The RSS body only has an image to scrape when the author embedded one
+// inline — a post whose only image is a proper "featured image" (set via
+// the editor's picker, never inserted into the text) has none at all, so
+// prefer the real featured image from the API and fall back to scraping.
 const extractFirstImg = (post: BlogPost): string | null => {
+  if (post.featuredImageUrl) return post.featuredImageUrl;
   const html = post['content:encoded'] || post.content || '';
   const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
   return match ? match[1] : null;

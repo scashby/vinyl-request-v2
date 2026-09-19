@@ -22,6 +22,7 @@ const SITE_PAGE_LINKS: PageLink[] = [
   { label: "🏠 Home Page", path: "/admin/edit-home" },
   { label: "📄 About Page", path: "/admin/edit-about" },
   { label: "🛍️ Merch Page", path: "/admin/edit-merch" },
+  { label: "💬 Dialogues Page", path: "/admin/edit-dialogues" },
   { label: "🌐 Social Embeds", path: "/admin/socials" },
 ];
 

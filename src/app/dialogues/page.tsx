@@ -8,6 +8,26 @@ import { useActiveTheme } from "src/lib/useActiveTheme";
 import { getSocialIcon } from "src/lib/socialIcons";
 import { DEFAULT_SECTIONS, type ConnectData, type HomepageSection } from "src/lib/homeContent";
 
+interface DialoguesIntroData {
+  heading: string;
+  subhead: string;
+}
+
+interface DialoguesSidebarData {
+  heading: string;
+  description: string;
+}
+
+const DEFAULT_INTRO: DialoguesIntroData = {
+  heading: "Dialogues",
+  subhead: "Crate digs, liner notes, and whatever else is on the turntable.",
+};
+
+const DEFAULT_SIDEBAR: DialoguesSidebarData = {
+  heading: "Follow Along",
+  description: "New posts, photos, and the playlist — wherever you already hang out.",
+};
+
 interface BlogPost {
   title: string;
   link: string;
@@ -17,11 +37,17 @@ interface BlogPost {
   content?: string;
   "content:encoded"?: string;
   categories?: string[];
+  featuredImageUrl?: string | null;
 }
 
 const CARD_TILT_VARS = ["--dwd-tilt-1", "--dwd-tilt-2", "--dwd-tilt-3", "--dwd-tilt-4"];
 
+// The RSS body only has an image to scrape when the author embedded one
+// inline — a post whose only image is a proper "featured image" (set via
+// the editor's picker, never inserted into the text) has none at all, so
+// prefer the real featured image from the API and fall back to scraping.
 function extractFirstImg(post: BlogPost): string | null {
+  if (post.featuredImageUrl) return post.featuredImageUrl;
   const html = post["content:encoded"] || post.content || "";
   const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
   if (match) return match[1];
@@ -46,6 +72,8 @@ export default function DialoguesPage() {
   const [featured, setFeatured] = useState<BlogPost | null>(null);
   const [articles, setArticles] = useState<BlogPost[]>([]);
   const [connectData, setConnectData] = useState<ConnectData>(DEFAULT_SECTIONS.connect);
+  const [intro, setIntro] = useState<DialoguesIntroData>(DEFAULT_INTRO);
+  const [sidebarCopy, setSidebarCopy] = useState<DialoguesSidebarData>(DEFAULT_SIDEBAR);
   const { cssVars } = useActiveTheme();
 
   useEffect(() => {
@@ -56,6 +84,18 @@ export default function DialoguesPage() {
         if (connectRow) setConnectData({ ...DEFAULT_SECTIONS.connect, ...connectRow.data });
       })
       .catch((err) => console.error("Error loading social links:", err));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/homepage-sections?page=dialogues")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((rows: { section_type: string; data: Record<string, unknown> }[]) => {
+        const introRow = rows.find((r) => r.section_type === "dialogues_intro");
+        if (introRow) setIntro({ ...DEFAULT_INTRO, ...introRow.data } as DialoguesIntroData);
+        const sidebarRow = rows.find((r) => r.section_type === "dialogues_sidebar");
+        if (sidebarRow) setSidebarCopy({ ...DEFAULT_SIDEBAR, ...sidebarRow.data } as DialoguesSidebarData);
+      })
+      .catch((err) => console.error("Error loading dialogues page content:", err));
   }, []);
 
   useEffect(() => {
@@ -88,10 +128,10 @@ export default function DialoguesPage() {
       <Container size="xl">
         <div className="pt-16 pb-10 md:pt-20">
           <div className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-4xl md:text-5xl mb-3">
-            Dialogues
+            {intro.heading}
           </div>
           <p className="text-lg text-[var(--dwd-ink-soft)] max-w-xl">
-            Crate digs, liner notes, and whatever else is on the turntable.
+            {intro.subhead}
           </p>
         </div>
 
@@ -208,10 +248,10 @@ export default function DialoguesPage() {
           >
             <div>
               <div className="text-lg font-bold mb-4 border-b border-[var(--dwd-ink)]/10 pb-2">
-                Follow Along
+                {sidebarCopy.heading}
               </div>
               <p className="text-sm text-[var(--dwd-ink-faint)] mb-4">
-                New posts, photos, and the playlist — wherever you already hang out.
+                {sidebarCopy.description}
               </p>
               <div className="flex flex-wrap gap-2.5">
                 {connectData.socials.map(({ name, url }) => {
