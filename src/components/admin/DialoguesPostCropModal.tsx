@@ -127,14 +127,15 @@ export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, 
         </div>
 
         <div className="p-6">
-          {/* The background is the whole photo, statically contained —
-              never panned, zoomed, or clipped — so what's outside the
-              frame is always the real rest of the image, not blank space
-              and not a shifted copy of the same crop. The frame on top
-              is the only part driven by focus/zoom, and it alone decides
-              what actually ships (see postFocusStyle). */}
+          {/* The background is the whole photo, at full brightness, statically
+              contained — never panned, zoomed, clipped, or darkened. Matches
+              Facebook's own "choose profile picture" pattern: the excluded
+              area isn't dimmed or washed out, it's just the same real photo,
+              with the frame's white outline as the only boundary marker. The
+              frame on top is the only part driven by focus/zoom, and it
+              alone decides what actually ships (see postFocusStyle). */}
           <div className="relative w-full aspect-[4/3] overflow-hidden rounded-lg bg-gray-100 select-none touch-none">
-            {/* eslint-disable-next-line @next/next/no-img-element -- needs to sit under the pan/zoom frame at the same stacking level as the raw <img> it dims against */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- needs to sit under the pan/zoom frame at the same stacking level as the raw <img> it's a backdrop for */}
             <img
               src={imageUrl}
               alt=""
@@ -145,7 +146,7 @@ export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, 
             <div
               ref={frameRef}
               onPointerDown={handlePointerDown}
-              className={`absolute overflow-hidden rounded border-2 border-white bg-gray-100 shadow-[0_0_0_9999px_rgba(17,24,39,0.6)] ${
+              className={`absolute overflow-hidden rounded border-2 border-white bg-gray-100 shadow-lg ${
                 isDragging ? "cursor-grabbing" : "cursor-grab"
               }`}
               style={FRAME_INSET_STYLE}
