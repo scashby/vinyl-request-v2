@@ -44,12 +44,12 @@ export function HeroSection({
         <div className="flex-1 min-w-0 w-full max-w-md md:max-w-none relative pt-3">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[18px] h-[18px] rounded-full bg-[var(--dwd-accent-2)] border-2 border-[var(--dwd-ink)] z-10" />
           {data.photo_url ? (
-            <div className="relative w-full aspect-[4/5] overflow-hidden [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)] [transform:rotate(var(--dwd-tilt-1))]">
+            <div className="relative w-full aspect-[4/5] overflow-hidden bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)] [transform:rotate(var(--dwd-tilt-1))]">
               {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
               <img
                 src={data.photo_url}
                 alt="Steve at the decks"
-                className="absolute inset-0 h-full w-full object-cover"
+                className="absolute inset-0 h-full w-full"
                 style={photoFocusStyle(data.photo_focus)}
               />
             </div>

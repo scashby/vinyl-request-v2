@@ -150,7 +150,7 @@ function PhotoField({
         <div className={`relative w-20 ${aspectClassName} rounded-lg border border-gray-300 bg-gray-50 overflow-hidden shrink-0`}>
           {url ? (
             // eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly
-            <img src={url} alt="" className="absolute inset-0 h-full w-full object-cover" style={photoFocusStyle(focus)} />
+            <img src={url} alt="" className="absolute inset-0 h-full w-full" style={photoFocusStyle(focus)} />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 text-center px-1">
               No photo

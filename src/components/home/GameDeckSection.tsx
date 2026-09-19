@@ -49,12 +49,12 @@ export function GameDeckSection({ data }: { data: GameDeckData }) {
           )}
         </div>
         {data.photo_url ? (
-          <div className="relative w-full sm:w-[280px] h-[180px] sm:h-[200px] flex-shrink-0 overflow-hidden -rotate-[1.8deg] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]">
+          <div className="relative w-full sm:w-[280px] h-[180px] sm:h-[200px] flex-shrink-0 overflow-hidden bg-[var(--dwd-bg)] -rotate-[1.8deg] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]">
             {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
             <img
               src={data.photo_url}
               alt="Vinyl Game Deck in action"
-              className="absolute inset-0 h-full w-full object-cover"
+              className="absolute inset-0 h-full w-full"
               style={photoFocusStyle(data.photo_focus)}
             />
           </div>

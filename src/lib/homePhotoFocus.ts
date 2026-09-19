@@ -10,23 +10,26 @@
 //
 // Model: an anchor point (x/y, % of the photo) plus a zoom factor,
 // rendered via CSS object-position + transform: scale() with a matching
-// transform-origin. This is valid at any zoom, including below 1x, where
-// it correctly reveals the slot's own background around the smaller
-// photo (real letterboxing) — unlike a crop-rectangle model, which can
-// never represent "smaller than the frame" because no rectangle can be
-// bigger than its own source image.
+// transform-origin, on top of an object-fit: contain baseline — NOT
+// cover. That distinction matters: cover always crops whichever axis
+// doesn't match the slot's aspect ratio, even at zoom 1 before the
+// person has touched anything, which silently cuts off part of a
+// photo or logo they never chose to crop. contain shows the whole
+// photo, fit inside the slot (with letterboxing on the mismatched
+// axis) as the default, and cropping only happens once you
+// deliberately zoom in past that point — the way Instagram/Facebook's
+// crop tools behave. Zooming in from zoom 1 grows the image until it
+// covers the slot and then keeps cropping in tighter; zooming out
+// shrinks the already-fully-visible image further within the slot.
 
 import type { CSSProperties } from "react";
 
 export type PhotoFocus = { x: number; y: number; zoom: number };
 
-// Centered, zoom 1 — the photo's own "cover" framing for whatever slot
-// it's placed in, before any pan or zoom adjustment.
+// Centered, zoom 1 — the whole photo, fit inside its slot, before any
+// pan or zoom adjustment. Nothing is cropped until you zoom in.
 export const DEFAULT_PHOTO_FOCUS: PhotoFocus = { x: 50, y: 50, zoom: 1 };
 
-// 0.6 (not lower) keeps zoom-out genuinely useful — a photo can still
-// shrink enough to show real letterboxing — without shrinking so far
-// that it reads as a rendering bug rather than a deliberate framing.
 export const MIN_PHOTO_ZOOM = 0.6;
 export const MAX_PHOTO_ZOOM = 3;
 
@@ -66,14 +69,18 @@ export function coercePhotoFocus(value: unknown): PhotoFocus {
   return DEFAULT_PHOTO_FOCUS;
 }
 
-// object-position places the anchor point at zoom 1 (the photo's normal
-// cover-fit framing); transform: scale(), anchored at that same point via
-// transform-origin, zooms in or out from there. Use with a plain <img
-// className="object-cover">, not next/image's fill mode, so the
+// objectFit is set here (not left to a className) so there is exactly
+// one source of truth for how the photo fits — a className that
+// disagreed with this is what let the old cover-based bug hide in
+// plain sight. object-position places the anchor point at zoom 1 (the
+// whole photo, fit inside the slot); transform: scale(), anchored at
+// that same point via transform-origin, zooms in or out from there.
+// Use with a plain <img>, not next/image's fill mode, so the
 // transform-origin percentages stay exact.
 export function photoFocusStyle(focus: unknown): CSSProperties {
   const f = coercePhotoFocus(focus);
   return {
+    objectFit: "contain",
     objectPosition: `${f.x}% ${f.y}%`,
     transform: f.zoom !== 1 ? `scale(${f.zoom})` : undefined,
     transformOrigin: `${f.x}% ${f.y}%`,
