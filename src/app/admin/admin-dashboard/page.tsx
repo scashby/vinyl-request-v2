@@ -127,8 +127,6 @@ export default function AdminDashboardPage() {
   }
 
   // Styles (Compact for brevity)
-  const externalToolWrapperStyle: CSSProperties = { background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', color: 'white', borderRadius: 16, padding: 24, marginBottom: 24 };
-  const externalLinkStyle: CSSProperties = { background: 'rgba(255,255,255,0.15)', color: 'white', padding: '10px 16px', borderRadius: 8, textDecoration: 'none', fontWeight: 600, fontSize: 13, textAlign: 'center', border: '1px solid rgba(255,255,255,0.2)', transition: 'all 0.2s' };
   const contentBoxStyle: CSSProperties = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 24 };
   const actionLinkBaseStyle: CSSProperties = { display: 'block', padding: '12px 16px', color: 'white', borderRadius: 8, textDecoration: 'none', fontWeight: 600, textAlign: 'center', fontSize: 14 };
 
@@ -137,24 +135,6 @@ export default function AdminDashboardPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
         <p className="text-base text-gray-500">Welcome back! Here&apos;s what&apos;s happening with Dead Wax Dialogues.</p>
-      </div>
-
-      <div style={externalToolWrapperStyle}>
-        <div style={{ marginBottom: 20 }}>
-          <h3 style={{ margin: 0, fontSize: 20, fontWeight: 600, marginBottom: 8 }}>🔗 External Admin Tools</h3>
-          <p style={{ margin: 0, opacity: 0.9, fontSize: 14 }}>Quick access to all your external services and platforms</p>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-          <Link href="https://blog.deadwaxdialogues.com/wp-admin/" target="_blank" style={externalLinkStyle}>📝 WordPress Admin</Link>
-          <Link href="https://console.hetzner.com/projects" target="_blank" style={externalLinkStyle}>🖥️ Hetzner Console</Link>
-          <Link href="https://business.facebook.com/" target="_blank" style={externalLinkStyle}>📘 Facebook Business</Link>
-          <Link href="https://login.buffer.com/login" target="_blank" style={externalLinkStyle}>📱 Buffer</Link>
-          <Link href="https://supabase.com/" target="_blank" style={externalLinkStyle}>🗄️ Supabase</Link>
-          <Link href="https://vercel.com/" target="_blank" style={externalLinkStyle}>▲ Vercel</Link>
-          <Link href="https://admin.google.com/" target="_blank" style={externalLinkStyle}>🔍 Google Admin</Link>
-          <Link href="https://login.squarespace.com/" target="_blank" style={externalLinkStyle}>⬛ Squarespace</Link>
-          <Link href="https://app.dub.co/login" target="_blank" style={externalLinkStyle}>🔗 Dub.co</Link>
-        </div>
       </div>
 
       {/* System Health */}
@@ -208,7 +188,7 @@ export default function AdminDashboardPage() {
               {authStatus === 'authenticated' ? (
                 <>
                   <Link href="/admin/manage-events" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #10b981, #047857)' }}>📅 Manage Events</Link>
-                  <Link href="/admin/diagnostics" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>🔍 Data Diagnostics</Link>
+                  <Link href="/admin/games" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>🎮 Games</Link>
                 </>
               ) : (
                 <Link href="/admin/login" style={{ ...actionLinkBaseStyle, background: 'linear-gradient(135deg, #dc2626, #b91c1c)' }}>🔑 Login Required</Link>
