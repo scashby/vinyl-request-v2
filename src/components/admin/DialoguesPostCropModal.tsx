@@ -128,7 +128,7 @@ export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, 
               currently cropped OUT are still visible, dimmed, around it —
               the only way to actually see how close a pan/zoom is to the
               visible frame's edges instead of guessing. */}
-          <div className="relative w-full aspect-[3/2] overflow-hidden rounded-lg bg-gray-100 select-none touch-none">
+          <div className="relative w-full aspect-[4/3] overflow-hidden rounded-lg bg-gray-100 select-none touch-none">
             <div className="absolute overflow-visible pointer-events-none" style={FRAME_INSET_STYLE}>
               {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
               <img

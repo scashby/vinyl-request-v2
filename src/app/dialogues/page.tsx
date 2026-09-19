@@ -197,7 +197,7 @@ export default function DialoguesPage() {
                     rel="noopener noreferrer"
                     className="flex flex-col h-full"
                   >
-                    <div className="relative h-48 w-full overflow-hidden">
+                    <div className="relative w-full aspect-[4/3] overflow-hidden">
                       {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
                       <img
                         src={extractFirstImg(post) || "/images/coverplaceholder.png"}

@@ -57,7 +57,7 @@ export function DialoguesTeaserSection({
               className="group block bg-[var(--dwd-bg-card)] overflow-hidden transition-transform duration-150 hover:!rotate-0 hover:-translate-y-1 [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)]"
               style={{ transform: `rotate(var(${CARD_TILT_VARS[i % CARD_TILT_VARS.length]}))` }}
             >
-              <div className="relative h-[150px] overflow-hidden bg-[var(--dwd-accent-3)]">
+              <div className="relative w-full aspect-[4/3] overflow-hidden bg-[var(--dwd-accent-3)]">
                 {extractFirstImg(post) ? (
                   // eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly
                   <img

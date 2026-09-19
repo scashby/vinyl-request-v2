@@ -262,7 +262,7 @@ export default function EditDialoguesPage() {
               const imgUrl = extractFirstImg(post);
               return (
                 <div key={post.link} className="border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="relative w-full aspect-[3/2] bg-gray-100 overflow-hidden">
+                  <div className="relative w-full aspect-[4/3] bg-gray-100 overflow-hidden">
                     {imgUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly
                       <img
