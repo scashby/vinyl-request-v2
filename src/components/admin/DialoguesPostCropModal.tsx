@@ -1,16 +1,20 @@
 // src/components/admin/DialoguesPostCropModal.tsx
 //
-// Pan/zoom editor for a single Dialogues blog post's card image. Deliberately
-// standalone — no imports from src/lib/imageCrop.ts (events) or
-// src/lib/homePhotoFocus.ts (Hero/Game Deck), and nothing here is imported
-// by either of those. See src/lib/dialoguesPostFocus.ts for why: sharing
-// code between unrelated crop tools previously let a change meant for one
-// silently break another.
+// Crop editor for a single Dialogues blog post's card image.
 //
-// Drag the photo to pan, scroll or use the slider to zoom in. The frame
-// here renders with the exact same postFocusStyle() the public pages use,
-// so there's nothing to translate between what's selected here and what
-// ships.
+// One photo, drawn once, at one scale. Drag it to reposition, use the
+// slider to make it bigger or smaller. On top sits a single overlay: the
+// clear rectangle is exactly the area that will be displayed on the page,
+// and the transparent grey covers everything that will fall outside it.
+// The photo is never clipped to that rectangle and never drawn twice.
+//
+// Geometry is computed here rather than left to object-fit so the photo
+// can extend past the display area into the grey. It reproduces exactly
+// what postFocusStyle() renders on the public pages: cover-fit base scale,
+// positioned by x/y as a percentage of the overflow, scaled by zoom.
+//
+// Standalone on purpose — shares nothing with src/lib/imageCrop.ts (events)
+// or src/lib/homePhotoFocus.ts (Hero/Game Deck).
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,7 +24,6 @@ import {
   DEFAULT_POST_FOCUS,
   MAX_POST_ZOOM,
   MIN_POST_ZOOM,
-  postFocusStyle,
   type PostFocus,
 } from "src/lib/dialoguesPostFocus";
 
@@ -32,40 +35,70 @@ type Props = {
   onClose: () => void;
 };
 
-// The crop frame sits inset within a slightly larger "stage". The stage's
-// background is the WHOLE photo, statically object-fit: contain'd — not
-// transformed by the current pan/zoom at all — so the area outside the
-// frame always shows real, complete image content, at every zoom level,
-// instead of going blank when nothing currently overflows the frame, and
-// instead of panning/zooming in lockstep with the frame (which would just
-// show a shifted sliver of the same crop, not the rest of the photo).
-// The frame's own box-shadow dims everything outside it as a spotlight.
-const FRAME_INSET_STYLE = { inset: "15%" };
+const DISPLAY_AREA_INSET = "15%";
+
+type Size = { w: number; h: number };
 
 export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, onSave, onClose }: Props) {
   const [focus, setFocus] = useState<PostFocus>(() => coercePostFocus(initialFocus));
   const [isDragging, setIsDragging] = useState(false);
   const [saving, setSaving] = useState(false);
-  const frameRef = useRef<HTMLDivElement | null>(null);
-  const dragState = useRef<{ startX: number; startY: number; origin: PostFocus } | null>(null);
-  const latestFocusRef = useRef(focus);
-  latestFocusRef.current = focus;
+  const [displayArea, setDisplayArea] = useState<Size | null>(null);
+  const [natural, setNatural] = useState<Size | null>(null);
+
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const displayAreaRef = useRef<HTMLDivElement | null>(null);
+  const focusRef = useRef(focus);
+  focusRef.current = focus;
+
+  useEffect(() => {
+    const el = displayAreaRef.current;
+    if (!el) return;
+    const measure = () => setDisplayArea({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Cover-fit base scale, then zoom on top of it — the same size the public
+  // card renders the photo at, so the display area shows exactly what ships.
+  const baseScale =
+    displayArea && natural ? Math.max(displayArea.w / natural.w, displayArea.h / natural.h) : 0;
+  const drawnWidth = natural ? natural.w * baseScale * focus.zoom : 0;
+  const drawnHeight = natural ? natural.h * baseScale * focus.zoom : 0;
+
+  // x/y place the photo across its own overflow, matching object-position.
+  const slackX = displayArea ? displayArea.w - drawnWidth : 0;
+  const slackY = displayArea ? displayArea.h - drawnHeight : 0;
+  const offsetX = (focus.x / 100) * slackX;
+  const offsetY = (focus.y / 100) * slackY;
+
+  const dragState = useRef<{ pointerX: number; pointerY: number; offsetX: number; offsetY: number } | null>(null);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
-    const frame = frameRef.current;
     const drag = dragState.current;
-    if (!frame || !drag) return;
+    const area = displayAreaRef.current;
+    const size = natural;
+    if (!drag || !area || !size) return;
 
-    const rect = frame.getBoundingClientRect();
-    const dxPercent = (((e.clientX - drag.startX) / rect.width) * 100) / drag.origin.zoom;
-    const dyPercent = (((e.clientY - drag.startY) / rect.height) * 100) / drag.origin.zoom;
+    const w = area.clientWidth;
+    const h = area.clientHeight;
+    const scale = Math.max(w / size.w, h / size.h) * focusRef.current.zoom;
+    const nextSlackX = w - size.w * scale;
+    const nextSlackY = h - size.h * scale;
 
-    setFocus(clampPostFocus({
-      x: drag.origin.x - dxPercent,
-      y: drag.origin.y - dyPercent,
-      zoom: drag.origin.zoom,
-    }));
-  }, []);
+    const nextOffsetX = drag.offsetX + (e.clientX - drag.pointerX);
+    const nextOffsetY = drag.offsetY + (e.clientY - drag.pointerY);
+
+    setFocus((current) =>
+      clampPostFocus({
+        ...current,
+        x: nextSlackX === 0 ? current.x : (nextOffsetX / nextSlackX) * 100,
+        y: nextSlackY === 0 ? current.y : (nextOffsetY / nextSlackY) * 100,
+      })
+    );
+  }, [natural]);
 
   const stopDragging = useCallback(() => {
     setIsDragging(false);
@@ -75,22 +108,23 @@ export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, 
   }, [handlePointerMove]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!natural || !displayArea) return;
     e.preventDefault();
-    dragState.current = { startX: e.clientX, startY: e.clientY, origin: focus };
+    dragState.current = { pointerX: e.clientX, pointerY: e.clientY, offsetX, offsetY };
     setIsDragging(true);
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", stopDragging);
   };
 
   useEffect(() => {
-    const frame = frameRef.current;
-    if (!frame) return;
-    const onWheelNative = (e: WheelEvent) => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      setFocus(clampPostFocus({ ...latestFocusRef.current, zoom: latestFocusRef.current.zoom - e.deltaY * 0.002 }));
+      setFocus((current) => clampPostFocus({ ...current, zoom: current.zoom - e.deltaY * 0.002 }));
     };
-    frame.addEventListener("wheel", onWheelNative, { passive: false });
-    return () => frame.removeEventListener("wheel", onWheelNative);
+    stage.addEventListener("wheel", onWheel, { passive: false });
+    return () => stage.removeEventListener("wheel", onWheel);
   }, []);
 
   useEffect(() => {
@@ -127,43 +161,44 @@ export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, 
         </div>
 
         <div className="p-6">
-          {/* The background is the whole photo, at full brightness, statically
-              contained — never panned, zoomed, clipped, or darkened. Matches
-              Facebook's own "choose profile picture" pattern: the excluded
-              area isn't dimmed or washed out, it's just the same real photo,
-              with the frame's white outline as the only boundary marker. The
-              frame on top is the only part driven by focus/zoom, and it
-              alone decides what actually ships (see postFocusStyle). */}
-          <div className="relative w-full aspect-[4/3] overflow-hidden rounded-lg bg-gray-100 select-none touch-none">
-            {/* eslint-disable-next-line @next/next/no-img-element -- needs to sit under the pan/zoom frame at the same stacking level as the raw <img> it's a backdrop for */}
-            <img
-              src={imageUrl}
-              alt=""
-              aria-hidden="true"
-              draggable={false}
-              className="absolute inset-0 h-full w-full object-contain pointer-events-none"
-            />
-            <div
-              ref={frameRef}
-              onPointerDown={handlePointerDown}
-              className={`absolute overflow-hidden rounded border-2 border-white bg-gray-100 shadow-lg ${
-                isDragging ? "cursor-grabbing" : "cursor-grab"
-              }`}
-              style={FRAME_INSET_STYLE}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
+          <div
+            ref={stageRef}
+            onPointerDown={handlePointerDown}
+            className={`relative w-full aspect-[4/3] overflow-hidden rounded-lg bg-gray-100 select-none touch-none ${
+              isDragging ? "cursor-grabbing" : "cursor-grab"
+            }`}
+          >
+            <div ref={displayAreaRef} className="absolute" style={{ inset: DISPLAY_AREA_INSET }}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- explicit pixel geometry, which next/image's own sizing would override */}
               <img
                 src={imageUrl}
                 alt={`${title} preview`}
                 draggable={false}
-                className="absolute inset-0 h-full w-full pointer-events-none"
-                style={postFocusStyle(focus)}
+                onLoad={(e) =>
+                  setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
+                }
+                className="absolute pointer-events-none"
+                style={
+                  natural && displayArea
+                    ? {
+                        left: offsetX,
+                        top: offsetY,
+                        width: drawnWidth,
+                        height: drawnHeight,
+                        maxWidth: "none",
+                      }
+                    : { visibility: "hidden" }
+                }
               />
             </div>
+            <div
+              className="absolute pointer-events-none rounded-sm border-2 border-white"
+              style={{ inset: DISPLAY_AREA_INSET, boxShadow: "0 0 0 9999px rgba(17, 24, 39, 0.45)" }}
+            />
           </div>
 
           <div className="mt-4 flex items-center gap-3">
-            <span className="text-xs text-gray-500 shrink-0">Zoom</span>
+            <span className="text-xs text-gray-500 shrink-0">Size</span>
             <input
               type="range"
               min={MIN_POST_ZOOM}
@@ -172,12 +207,14 @@ export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, 
               value={focus.zoom}
               onChange={(e) => setFocus(clampPostFocus({ ...focus, zoom: Number.parseFloat(e.target.value) }))}
               className="w-full"
-              aria-label={`${title} zoom`}
+              aria-label={`${title} size`}
             />
             <span className="text-xs text-gray-500 shrink-0 w-9 text-right">{focus.zoom.toFixed(2)}x</span>
           </div>
           <div className="mt-2 flex items-center justify-between">
-            <p className="text-xs text-gray-500">Drag to pan &middot; scroll or drag the slider to zoom</p>
+            <p className="text-xs text-gray-500">
+              Inside the box is what shows on the page &middot; drag to reposition
+            </p>
             <button
               type="button"
               onClick={() => setFocus(DEFAULT_POST_FOCUS)}
