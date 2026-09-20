@@ -21,6 +21,7 @@ const SITE_PAGE_LINKS: PageLink[] = [
   { label: "🎮 Games", path: "/admin/edit-games" },
   { label: "🏠 Home Page", path: "/admin/edit-home" },
   { label: "📄 About Page", path: "/admin/edit-about" },
+  { label: "⭐ Most Wanted", path: "/admin/most-wanted" },
   { label: "🛍️ Merch Page", path: "/admin/edit-merch" },
   { label: "💬 Dialogues Page", path: "/admin/edit-dialogues" },
   { label: "🌐 Social Embeds", path: "/admin/socials" },
