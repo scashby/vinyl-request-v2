@@ -4,6 +4,8 @@ import './globals.css';
 import { AuthProvider } from '../components/AuthProvider';
 import NavigationMenu from '../components/NavigationMenu';
 import Footer from '../components/Footer';
+import { getActiveTheme } from 'src/lib/getActiveThemeServer';
+import { ActiveThemeProvider } from 'src/components/ActiveThemeProvider';
 import {
   Alfa_Slab_One,
   Archivo,
@@ -81,25 +83,33 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({
+// Re-resolves the active theme at most every 5 minutes instead of on every
+// request, so an admin theme switch shows up site-wide within a few
+// minutes without paying for a live DB read on every page view.
+export const revalidate = 300;
+
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const theme = await getActiveTheme();
   return (
     <html lang="en">
       {/* FIXED: Removed 'bg-black text-white' to stop forced dark mode.
           The app will now use the defaults from globals.css.
       */}
       <body className={`${inter.variable} ${playfair.variable} ${libreBarcode.variable} ${alfaSlab.variable} ${workSans.variable} ${archivoBlack.variable} ${archivo.variable} ${spaceGrotesk.variable} ${karla.variable} font-sans min-h-screen flex flex-col`}>
-        <AuthProvider>
-          {/* REMOVED: AlbumContextManager wrapper (Audio Recognition) */}
-          <NavigationMenu />
-          <main className="min-h-screen flex-1">
-            {children}
-          </main>
-          <Footer />
-        </AuthProvider>
+        <ActiveThemeProvider theme={theme}>
+          <AuthProvider>
+            {/* REMOVED: AlbumContextManager wrapper (Audio Recognition) */}
+            <NavigationMenu />
+            <main className="min-h-screen flex-1">
+              {children}
+            </main>
+            <Footer />
+          </AuthProvider>
+        </ActiveThemeProvider>
       </body>
     </html>
   );

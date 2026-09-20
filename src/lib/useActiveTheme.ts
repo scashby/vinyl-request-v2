@@ -1,23 +1,15 @@
 // src/lib/useActiveTheme.ts
-// Shared client-side hook for fetching the active site theme. Used by the
-// homepage, nav, footer, and now About/Dialogues/Merch — previously each
-// component duplicated this fetch-and-fallback logic individually.
+// Shared client-side hook for reading the active site theme. The real
+// theme is resolved server-side once, in the root layout, and provided via
+// ActiveThemeContext — this hook just reads it, so every page/component
+// gets the correct theme on its first render instead of starting on
+// DEFAULT_THEME and re-rendering once a client fetch resolves (that
+// start-wrong-then-swap was a visible flash on every page load).
 
-import { useEffect, useState } from 'react';
-import { DEFAULT_THEME, THEMES, isThemeName, toCssVars, type ThemeName } from 'src/lib/theme';
+import { useActiveThemeTokens } from 'src/components/ActiveThemeProvider';
+import { toCssVars } from 'src/lib/theme';
 
 export function useActiveTheme() {
-  const [themeName, setThemeName] = useState<ThemeName>(DEFAULT_THEME);
-
-  useEffect(() => {
-    fetch('/api/site-theme')
-      .then((res) => res.json())
-      .then((data) => {
-        if (isThemeName(data?.theme)) setThemeName(data.theme);
-      })
-      .catch((err) => console.error('Error loading active theme:', err));
-  }, []);
-
-  const theme = THEMES[themeName];
-  return { theme, themeName, cssVars: toCssVars(theme) as React.CSSProperties };
+  const theme = useActiveThemeTokens();
+  return { theme, themeName: theme.name, cssVars: toCssVars(theme) as React.CSSProperties };
 }
