@@ -1,7 +1,7 @@
 import { Container } from 'components/ui/Container';
-import type { ResidencyData } from 'src/lib/homeContent';
+import { fillTokens, type ResidencyData, type ResidencyTokens } from 'src/lib/homeContent';
 
-export function ResidencySection({ data }: { data: ResidencyData }) {
+export function ResidencySection({ data, tokens }: { data: ResidencyData; tokens: ResidencyTokens }) {
   return (
     <Container size="xl">
       <div
@@ -14,16 +14,16 @@ export function ResidencySection({ data }: { data: ResidencyData }) {
             className="text-xs font-bold uppercase tracking-[0.16em] mb-3 opacity-60"
             style={{ color: 'var(--dwd-residency-ink)' }}
           >
-            {data.eyebrow}
+            {fillTokens(data.eyebrow, tokens)}
           </div>
           <div
             className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-2xl md:text-4xl leading-tight"
             style={{ color: 'var(--dwd-residency-ink)' }}
           >
-            Every {data.night} &mdash; {data.venue}
+            {fillTokens(data.headline, tokens)}
           </div>
           <div className="text-sm mt-3 max-w-md opacity-70" style={{ color: 'var(--dwd-residency-ink)' }}>
-            {data.description}
+            {fillTokens(data.description, tokens)}
           </div>
         </div>
         <a

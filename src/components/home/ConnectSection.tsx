@@ -1,17 +1,17 @@
 import { SiSpotify } from 'react-icons/si';
 import { Container } from 'components/ui/Container';
 import { getSocialIcon } from 'src/lib/socialIcons';
-import type { ConnectData } from 'src/lib/homeContent';
+import { fillTokens, type ConnectData, type ResidencyTokens } from 'src/lib/homeContent';
 
-export function ConnectSection({ data }: { data: ConnectData }) {
+export function ConnectSection({ data, tokens }: { data: ConnectData; tokens: ResidencyTokens }) {
   const spotifyUrl = data.socials.find((s) => s.name === 'Spotify')?.url;
   return (
     <Container size="xl">
       <div className="text-center pb-16 md:pb-20">
         <div className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-2xl md:text-[30px] text-[var(--dwd-ink)] mb-2.5">
-          {data.heading}
+          {fillTokens(data.heading, tokens)}
         </div>
-        <div className="text-base text-[var(--dwd-ink-faint)] mb-9">{data.subhead}</div>
+        <div className="text-base text-[var(--dwd-ink-faint)] mb-9">{fillTokens(data.subhead, tokens)}</div>
         <div className="flex justify-center gap-4 flex-wrap mb-11">
           {data.socials.map(({ name, url }) => {
             const Icon = getSocialIcon(name);

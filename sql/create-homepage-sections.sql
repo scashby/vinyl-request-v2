@@ -60,6 +60,9 @@ INSERT INTO homepage_sections (page, section_type, position, data) VALUES
   "eyebrow": "The Residency",
   "venue": "Devil''s Purse Brewery",
   "night": "Sunday",
+  "season_start": "November",
+  "season_end": "April",
+  "headline": "Every {night} — {venue}",
   "description": "Same bar, same crate of records, same good time. Pull up a stool and put in a request.",
   "cta_label": "Get Directions",
   "cta_href": "https://www.google.com/maps/search/?api=1&query=Devil%27s+Purse+Brewery"

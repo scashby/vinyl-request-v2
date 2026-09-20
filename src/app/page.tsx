@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "src/lib/supabaseClient";
-import { resolveSections, type HomepageSection } from "src/lib/homeContent";
+import { resolveSections, residencySeasonLabel, type HomepageSection, type ResidencyTokens } from "src/lib/homeContent";
 import { useActiveTheme } from "src/lib/useActiveTheme";
 import { HeroSection } from "src/components/home/HeroSection";
 import { ResidencySection } from "src/components/home/ResidencySection";
@@ -135,7 +135,13 @@ export default function Page() {
   }, [events]);
 
   const s = resolveSections(sections);
-  const tokens = { night: s.residency.data.night, venue: s.residency.data.venue };
+  const tokens: ResidencyTokens = {
+    night: s.residency.data.night,
+    venue: s.residency.data.venue,
+    season: residencySeasonLabel(s.residency.data),
+    season_start: s.residency.data.season_start,
+    season_end: s.residency.data.season_end,
+  };
   const isVisible = (row: HomepageSection<unknown> | null) => row?.visible ?? true;
 
   return (
@@ -144,7 +150,7 @@ export default function Page() {
       style={cssVars}
     >
       {isVisible(s.hero.row) && <HeroSection data={s.hero.data} tokens={tokens} />}
-      {isVisible(s.residency.row) && <ResidencySection data={s.residency.data} />}
+      {isVisible(s.residency.row) && <ResidencySection data={s.residency.data} tokens={tokens} />}
       {isVisible(s.events_strip.row) && (
         <EventsStripSection
           data={s.events_strip.data}
@@ -154,11 +160,11 @@ export default function Page() {
         />
       )}
       {isVisible(s.bio.row) && <BioSection data={s.bio.data} tokens={tokens} />}
-      {isVisible(s.game_deck.row) && <GameDeckSection data={s.game_deck.data} />}
+      {isVisible(s.game_deck.row) && <GameDeckSection data={s.game_deck.data} tokens={tokens} />}
       {isVisible(s.dialogues_teaser.row) && (
-        <DialoguesTeaserSection data={s.dialogues_teaser.data} posts={posts} />
+        <DialoguesTeaserSection data={s.dialogues_teaser.data} tokens={tokens} posts={posts} />
       )}
-      {isVisible(s.connect.row) && <ConnectSection data={s.connect.data} />}
+      {isVisible(s.connect.row) && <ConnectSection data={s.connect.data} tokens={tokens} />}
     </div>
   );
 }

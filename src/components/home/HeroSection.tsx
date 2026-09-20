@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Container } from 'components/ui/Container';
-import { fillTokens, type HeroData } from 'src/lib/homeContent';
+import { fillTokens, type HeroData, type ResidencyTokens } from 'src/lib/homeContent';
 import { photoFocusStyle } from 'src/lib/homePhotoFocus';
 
 export function HeroSection({
@@ -8,7 +8,7 @@ export function HeroSection({
   tokens,
 }: {
   data: HeroData;
-  tokens: { night: string; venue: string };
+  tokens: ResidencyTokens;
 }) {
   return (
     <Container size="xl">
@@ -18,13 +18,13 @@ export function HeroSection({
             className="inline-block rounded-[var(--dwd-badge-radius)] px-4 py-1.5 text-xs font-bold uppercase tracking-[0.1em] mb-6 -rotate-1 [border:var(--dwd-badge-border)]"
             style={{ background: 'var(--dwd-badge-bg)', color: 'var(--dwd-badge-color)' }}
           >
-            {data.eyebrow}
+            {fillTokens(data.eyebrow, tokens)}
           </div>
           <h1 className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-4xl sm:text-5xl md:text-6xl leading-[1.08] mb-6 text-[var(--dwd-ink)]">
             {fillTokens(data.headline, tokens)}
           </h1>
           <p className="text-lg md:text-xl leading-relaxed text-[var(--dwd-ink-soft)] max-w-xl mb-9">
-            {data.subhead}
+            {fillTokens(data.subhead, tokens)}
           </p>
           <div className="flex gap-4 flex-wrap">
             <Link
