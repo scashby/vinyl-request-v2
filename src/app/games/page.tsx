@@ -80,21 +80,9 @@ function GameTile({ game, tilt }: { game: PublicGame; tilt: string }) {
           )}
         </div>
 
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <h3 className="text-lg font-bold tracking-tight leading-snug">
-            {game.title}
-          </h3>
-          <span
-            className="shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold"
-            style={
-              isProduction
-                ? { background: 'color-mix(in srgb, var(--dwd-accent-2) 18%, transparent)', color: 'var(--dwd-accent-2)' }
-                : { background: 'color-mix(in srgb, var(--dwd-accent-3) 25%, transparent)', color: 'var(--dwd-ink)' }
-            }
-          >
-            {isProduction ? "Live" : "In development"}
-          </span>
-        </div>
+        <h3 className="text-lg font-bold tracking-tight leading-snug mb-3">
+          {game.title}
+        </h3>
 
         <p className="text-sm text-[var(--dwd-ink-soft)] leading-relaxed flex-1">
           {game.tagline || game.coreMechanic || "More details coming soon."}
