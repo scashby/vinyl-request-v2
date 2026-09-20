@@ -139,6 +139,8 @@ export default function Page() {
     night: s.residency.data.night,
     venue: s.residency.data.venue,
     season: residencySeasonLabel(s.residency.data),
+    season_start: s.residency.data.season_start,
+    season_end: s.residency.data.season_end,
   };
   const isVisible = (row: HomepageSection<unknown> | null) => row?.visible ?? true;
 

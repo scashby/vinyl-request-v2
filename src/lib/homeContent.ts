@@ -101,6 +101,8 @@ export interface ResidencyTokens {
   night: string;
   venue: string;
   season: string; // e.g. "November – April"; empty if no season is set
+  season_start: string; // e.g. "November"
+  season_end: string; // e.g. "April"
 }
 
 // Builds the "{season}" token from the residency's start/end, e.g.
@@ -109,11 +111,16 @@ export interface ResidencyTokens {
 export const residencySeasonLabel = (data: Pick<ResidencyData, 'season_start' | 'season_end'>): string =>
   data.season_start && data.season_end ? `${data.season_start} – ${data.season_end}` : '';
 
-// Replaces "{night}"/"{venue}"/"{season}" tokens in section copy with the
-// residency section's actual values, so editing the residency once updates
-// every section that references it.
+// Replaces "{night}"/"{venue}"/"{season}"/"{season_start}"/"{season_end}"
+// tokens in section copy with the residency section's actual values, so
+// editing the residency once updates every section that references it.
 export const fillTokens = (text: string, tokens: ResidencyTokens): string =>
-  text.replace('{night}', tokens.night).replace('{venue}', tokens.venue).replace('{season}', tokens.season);
+  text
+    .replace('{night}', tokens.night)
+    .replace('{venue}', tokens.venue)
+    .replace('{season_start}', tokens.season_start)
+    .replace('{season_end}', tokens.season_end)
+    .replace('{season}', tokens.season);
 
 export const DEFAULT_SECTIONS: {
   hero: HeroData;
