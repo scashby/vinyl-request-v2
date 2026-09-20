@@ -6,6 +6,12 @@ import { AuthProvider, useSession } from "components/AuthProvider";
 import { useRouter, usePathname } from "next/navigation";
 import AdminSidebar from "components/AdminSidebar";
 
+// The root layout sets `revalidate = 300` so the public site doesn't flash
+// stale content on load, but that setting cascades to every route that
+// doesn't opt out — including this one. Admin pages are session-specific
+// and edit live data, so they must never be served from that cache.
+export const dynamic = "force-dynamic";
+
 function RequireAuth({ children }: { children: ReactNode }) {
   const { session } = useSession();
   const router = useRouter();

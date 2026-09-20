@@ -83,10 +83,11 @@ export const metadata = {
   },
 };
 
-// Re-resolves the active theme at most every 5 minutes instead of on every
-// request, so an admin theme switch shows up site-wide within a few
-// minutes without paying for a live DB read on every page view.
-export const revalidate = 300;
+// Every page (theme + homepage copy included) is resolved fresh on every
+// request — no ISR window. A cached window meant admin edits, including
+// admin pages themselves, could take up to 5 minutes to show up, which
+// doesn't match how this site actually gets worked on.
+export const dynamic = "force-dynamic";
 
 export default async function RootLayout({
   children,
