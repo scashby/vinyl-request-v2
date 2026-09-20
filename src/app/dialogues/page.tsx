@@ -6,7 +6,7 @@ import { Container } from "components/ui/Container";
 import { useActiveTheme } from "src/lib/useActiveTheme";
 import { getSocialIcon } from "src/lib/socialIcons";
 import { DEFAULT_SECTIONS, type ConnectData, type HomepageSection } from "src/lib/homeContent";
-import { postFocusStyle } from "src/lib/dialoguesPostFocus";
+import DialoguesPostImage from "src/components/DialoguesPostImage";
 
 interface DialoguesIntroData {
   heading: string;
@@ -145,12 +145,10 @@ export default function DialoguesPage() {
                 className="overflow-hidden mb-10 flex flex-col md:flex-row bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)]"
               >
                 <div className="md:w-1/2 md:self-start relative aspect-[4/3] overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
-                  <img
+                  <DialoguesPostImage
                     src={extractFirstImg(featured) || "/images/coverplaceholder.png"}
                     alt={featured.title}
-                    className="absolute inset-0 h-full w-full"
-                    style={postFocusStyle(featured.postFocus)}
+                    focus={featured.postFocus}
                   />
                 </div>
                 <div className="p-8 md:w-1/2 flex flex-col justify-center">
@@ -198,12 +196,10 @@ export default function DialoguesPage() {
                     className="flex flex-col h-full"
                   >
                     <div className="relative w-full aspect-[4/3] overflow-hidden">
-                      {/* eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly */}
-                      <img
+                      <DialoguesPostImage
                         src={extractFirstImg(post) || "/images/coverplaceholder.png"}
                         alt={post.title}
-                        className="absolute inset-0 h-full w-full"
-                        style={postFocusStyle(post.postFocus)}
+                        focus={post.postFocus}
                       />
                     </div>
                     <div className="p-5 flex flex-col flex-1">

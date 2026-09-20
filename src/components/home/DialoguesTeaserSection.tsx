@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Container } from 'components/ui/Container';
 import type { DialoguesTeaserData } from 'src/lib/homeContent';
-import { postFocusStyle } from 'src/lib/dialoguesPostFocus';
+import DialoguesPostImage from 'src/components/DialoguesPostImage';
 
 interface BlogPost {
   title: string;
@@ -59,13 +59,7 @@ export function DialoguesTeaserSection({
             >
               <div className="relative w-full aspect-[4/3] overflow-hidden bg-[var(--dwd-accent-3)]">
                 {extractFirstImg(post) ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly
-                  <img
-                    src={extractFirstImg(post) as string}
-                    alt=""
-                    className="absolute inset-0 h-full w-full"
-                    style={postFocusStyle(post.postFocus)}
-                  />
+                  <DialoguesPostImage src={extractFirstImg(post) as string} alt="" focus={post.postFocus} />
                 ) : null}
               </div>
               <div className="p-5">

@@ -70,16 +70,48 @@ export function keyForPostLink(link: string): string {
   return hash.toString(36);
 }
 
-// object-fit: cover baseline (this is real photography in a fixed card
-// grid, not a logo — filling the frame is the expected look), with
-// object-position + transform: scale() for pan/zoom on top, anchored at
-// the same point via transform-origin so zooming doesn't drift the anchor.
-export function postFocusStyle(focus: unknown): CSSProperties {
+// Where to draw the photo inside a box of a given size. Cover is the
+// baseline — at zoom 1 the photo exactly fills the box — and zoom scales
+// the whole photo from there, up (tighter crop) or down (the photo sits
+// smaller than the box, letterboxed, which is a legitimate choice for a
+// poster you want shown whole). x/y place it across whatever slack that
+// leaves, the same way object-position does.
+//
+// This is deliberately the ONLY place this geometry is defined. It used
+// to be a CSS-only object-fit: cover + transform: scale(), but that crops
+// to cover BEFORE the scale applies, so below zoom 1 it shrank an
+// already-cropped photo instead of revealing the rest of it — the editor
+// and the live card then disagreed about what a saved crop meant.
+export function postImageGeometry(
+  focus: unknown,
+  box: { width: number; height: number },
+  natural: { width: number; height: number }
+): { left: number; top: number; width: number; height: number } {
   const f = coercePostFocus(focus);
+  const coverScale = Math.max(box.width / natural.width, box.height / natural.height);
+  const width = natural.width * coverScale * f.zoom;
+  const height = natural.height * coverScale * f.zoom;
   return {
-    objectFit: "cover",
-    objectPosition: `${f.x}% ${f.y}%`,
-    transform: f.zoom !== 1 ? `scale(${f.zoom})` : undefined,
-    transformOrigin: `${f.x}% ${f.y}%`,
+    width,
+    height,
+    left: (f.x / 100) * (box.width - width),
+    top: (f.y / 100) * (box.height - height),
+  };
+}
+
+export function postImageStyle(
+  focus: unknown,
+  box: { width: number; height: number } | null,
+  natural: { width: number; height: number } | null
+): CSSProperties {
+  if (!box || !natural || !natural.width || !natural.height) return { visibility: "hidden" };
+  const g = postImageGeometry(focus, box, natural);
+  return {
+    position: "absolute",
+    left: g.left,
+    top: g.top,
+    width: g.width,
+    height: g.height,
+    maxWidth: "none",
   };
 }

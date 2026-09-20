@@ -89,9 +89,13 @@ export async function GET() {
       postFocus: item.link ? postFocusByKey.get(keyForPostLink(item.link)) ?? null : null,
     }));
 
+    // Not cacheable: this payload carries the per-post crop overrides, which
+    // are live admin edits. An s-maxage here meant saving a crop changed
+    // nothing on the site until the CDN copy expired. The slow part — the
+    // WordPress REST lookup — keeps its own revalidate above.
     return NextResponse.json({ items }, {
       status: 200,
-      headers: { 'Cache-Control': 's-maxage=1800' }
+      headers: { 'Cache-Control': 'no-store' }
     });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Unknown error';

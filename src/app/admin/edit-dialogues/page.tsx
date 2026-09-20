@@ -10,7 +10,8 @@
 
 import { useEffect, useState } from "react";
 import DialoguesPostCropModal from "src/components/admin/DialoguesPostCropModal";
-import { postFocusStyle, type PostFocus } from "src/lib/dialoguesPostFocus";
+import DialoguesPostImage from "src/components/DialoguesPostImage";
+import { type PostFocus } from "src/lib/dialoguesPostFocus";
 
 interface BlogPostSummary {
   title: string;
@@ -264,13 +265,7 @@ export default function EditDialoguesPage() {
                 <div key={post.link} className="border border-gray-200 rounded-lg overflow-hidden">
                   <div className="relative w-full aspect-[4/3] bg-gray-100 overflow-hidden">
                     {imgUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- transform-origin math needs a raw img, which next/image's fill mode can't express exactly
-                      <img
-                        src={imgUrl}
-                        alt=""
-                        className="absolute inset-0 h-full w-full"
-                        style={postFocusStyle(post.postFocus)}
-                      />
+                      <DialoguesPostImage src={imgUrl} alt="" focus={post.postFocus} />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
                         No image

@@ -24,6 +24,7 @@ import {
   DEFAULT_POST_FOCUS,
   MAX_POST_ZOOM,
   MIN_POST_ZOOM,
+  postImageGeometry,
   type PostFocus,
 } from "src/lib/dialoguesPostFocus";
 
@@ -31,7 +32,7 @@ type Props = {
   imageUrl: string;
   title: string;
   initialFocus: unknown;
-  onSave: (focus: PostFocus) => void;
+  onSave: (focus: PostFocus) => void | Promise<void>;
   onClose: () => void;
 };
 
@@ -61,18 +62,12 @@ export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, 
     return () => observer.disconnect();
   }, []);
 
-  // Cover-fit base scale, then zoom on top of it — the same size the public
-  // card renders the photo at, so the display area shows exactly what ships.
-  const baseScale =
-    displayArea && natural ? Math.max(displayArea.w / natural.w, displayArea.h / natural.h) : 0;
-  const drawnWidth = natural ? natural.w * baseScale * focus.zoom : 0;
-  const drawnHeight = natural ? natural.h * baseScale * focus.zoom : 0;
-
-  // x/y place the photo across its own overflow, matching object-position.
-  const slackX = displayArea ? displayArea.w - drawnWidth : 0;
-  const slackY = displayArea ? displayArea.h - drawnHeight : 0;
-  const offsetX = (focus.x / 100) * slackX;
-  const offsetY = (focus.y / 100) * slackY;
+  // Exactly the geometry every public render site draws with, so the
+  // display area below is literally what ships.
+  const drawn =
+    displayArea && natural
+      ? postImageGeometry(focus, { width: displayArea.w, height: displayArea.h }, { width: natural.w, height: natural.h })
+      : null;
 
   const dragState = useRef<{ pointerX: number; pointerY: number; offsetX: number; offsetY: number } | null>(null);
 
@@ -84,9 +79,9 @@ export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, 
 
     const w = area.clientWidth;
     const h = area.clientHeight;
-    const scale = Math.max(w / size.w, h / size.h) * focusRef.current.zoom;
-    const nextSlackX = w - size.w * scale;
-    const nextSlackY = h - size.h * scale;
+    const current = postImageGeometry(focusRef.current, { width: w, height: h }, { width: size.w, height: size.h });
+    const nextSlackX = w - current.width;
+    const nextSlackY = h - current.height;
 
     const nextOffsetX = drag.offsetX + (e.clientX - drag.pointerX);
     const nextOffsetY = drag.offsetY + (e.clientY - drag.pointerY);
@@ -108,9 +103,9 @@ export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, 
   }, [handlePointerMove]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!natural || !displayArea) return;
+    if (!drawn) return;
     e.preventDefault();
-    dragState.current = { pointerX: e.clientX, pointerY: e.clientY, offsetX, offsetY };
+    dragState.current = { pointerX: e.clientX, pointerY: e.clientY, offsetX: drawn.left, offsetY: drawn.top };
     setIsDragging(true);
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", stopDragging);
@@ -137,11 +132,8 @@ export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, 
 
   const save = async () => {
     setSaving(true);
-    try {
-      onSave(focus);
-    } finally {
-      setSaving(false);
-    }
+    await onSave(focus);
+    onClose();
   };
 
   return (
@@ -179,14 +171,8 @@ export default function DialoguesPostCropModal({ imageUrl, title, initialFocus, 
                 }
                 className="absolute pointer-events-none"
                 style={
-                  natural && displayArea
-                    ? {
-                        left: offsetX,
-                        top: offsetY,
-                        width: drawnWidth,
-                        height: drawnHeight,
-                        maxWidth: "none",
-                      }
+                  drawn
+                    ? { left: drawn.left, top: drawn.top, width: drawn.width, height: drawn.height, maxWidth: "none" }
                     : { visibility: "hidden" }
                 }
               />
