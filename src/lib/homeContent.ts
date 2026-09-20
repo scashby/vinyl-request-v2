@@ -9,54 +9,59 @@
 
 import { DEFAULT_PHOTO_FOCUS, type PhotoFocus } from "src/lib/homePhotoFocus";
 
+// Fields marked "tokenized" may contain "{night}" / "{venue}" / "{season}",
+// filled in from the Residency section's own data via fillTokens().
 export interface HeroData {
-  eyebrow: string;
-  headline: string; // may contain "{night}" / "{venue}" tokens
-  subhead: string;
+  eyebrow: string; // tokenized
+  headline: string; // tokenized
+  subhead: string; // tokenized
   primary_cta_label: string;
   primary_cta_href: string;
   secondary_cta_label: string;
   secondary_cta_href: string;
   photo_url: string; // shown instead of the placeholder once set
   photo_focus: PhotoFocus; // pan/zoom framing of photo_url within its (4:5) slot
-  photo_placeholder_text: string; // may contain "{venue}"; shown until photo_url is set
+  photo_placeholder_text: string; // tokenized; shown until photo_url is set
 }
 
 export interface ResidencyData {
-  eyebrow: string;
+  eyebrow: string; // tokenized
   venue: string;
   night: string;
-  description: string;
+  season_start: string; // e.g. "November"; empty means no season shown
+  season_end: string; // e.g. "April"
+  headline: string; // tokenized, e.g. "Every {night} — {venue}"
+  description: string; // tokenized
   cta_label: string;
   cta_href: string;
 }
 
 export interface EventsStripData {
-  heading: string;
+  heading: string; // tokenized
   cta_label: string;
   cta_href: string;
-  empty_state_text: string; // may contain "{night}" / "{venue}" tokens
+  empty_state_text: string; // tokenized
 }
 
 export interface BioData {
-  eyebrow: string;
-  body: string; // may contain "{venue}"
+  eyebrow: string; // tokenized
+  body: string; // tokenized
 }
 
 export interface GameDeckData {
-  eyebrow: string;
-  headline: string;
-  body: string;
+  eyebrow: string; // tokenized
+  headline: string; // tokenized
+  body: string; // tokenized
   chips: string[];
   cta_label: string;
   cta_href: string;
   photo_url: string; // shown instead of the placeholder once set
   photo_focus: PhotoFocus; // pan/zoom framing of photo_url within its (7:5) slot
-  photo_placeholder_text: string; // shown until photo_url is set
+  photo_placeholder_text: string; // tokenized; shown until photo_url is set
 }
 
 export interface DialoguesTeaserData {
-  heading: string;
+  heading: string; // tokenized
   cta_label: string;
   cta_href: string;
 }
@@ -67,8 +72,8 @@ export interface SocialLink {
 }
 
 export interface ConnectData {
-  heading: string;
-  subhead: string;
+  heading: string; // tokenized
+  subhead: string; // tokenized
   socials: SocialLink[];
   spotify_fallback_label: string;
   spotify_fallback_sublabel: string;
@@ -92,13 +97,23 @@ export interface HomepageSection<T = unknown> {
   data: T;
 }
 
-// Replaces a "{night}"/"{venue}" token in section copy with the residency
-// section's actual values, so editing the residency once updates every
-// section that references it.
-export const fillTokens = (
-  text: string,
-  tokens: { night: string; venue: string }
-): string => text.replace('{night}', tokens.night).replace('{venue}', tokens.venue);
+export interface ResidencyTokens {
+  night: string;
+  venue: string;
+  season: string; // e.g. "November – April"; empty if no season is set
+}
+
+// Builds the "{season}" token from the residency's start/end, e.g.
+// "November – April". Empty if either side is unset, so copy referencing
+// "{season}" collapses cleanly instead of showing a dangling separator.
+export const residencySeasonLabel = (data: Pick<ResidencyData, 'season_start' | 'season_end'>): string =>
+  data.season_start && data.season_end ? `${data.season_start} – ${data.season_end}` : '';
+
+// Replaces "{night}"/"{venue}"/"{season}" tokens in section copy with the
+// residency section's actual values, so editing the residency once updates
+// every section that references it.
+export const fillTokens = (text: string, tokens: ResidencyTokens): string =>
+  text.replace('{night}', tokens.night).replace('{venue}', tokens.venue).replace('{season}', tokens.season);
 
 export const DEFAULT_SECTIONS: {
   hero: HeroData;
@@ -126,6 +141,9 @@ export const DEFAULT_SECTIONS: {
     eyebrow: 'The Residency',
     venue: "Devil's Purse Brewery",
     night: 'Sunday',
+    season_start: 'November',
+    season_end: 'April',
+    headline: 'Every {night} — {venue}',
     description:
       'Same bar, same crate of records, same good time. Pull up a stool and put in a request.',
     cta_label: 'Get Directions',

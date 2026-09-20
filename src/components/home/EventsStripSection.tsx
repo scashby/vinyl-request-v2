@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Container } from 'components/ui/Container';
 import { formatEventText } from 'src/utils/textFormatter';
-import { fillTokens, type EventsStripData } from 'src/lib/homeContent';
+import { fillTokens, type EventsStripData, type ResidencyTokens } from 'src/lib/homeContent';
 
 interface EventLite {
   id: number;
@@ -47,7 +47,7 @@ export function EventsStripSection({
   events,
 }: {
   data: EventsStripData;
-  tokens: { night: string; venue: string };
+  tokens: ResidencyTokens;
   loading: boolean;
   events: EventLite[];
 }) {
@@ -56,7 +56,7 @@ export function EventsStripSection({
       <div className="mb-16 md:mb-20">
         <div className="flex items-baseline justify-between mb-7">
           <div className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-2xl md:text-3xl text-[var(--dwd-ink)]">
-            {data.heading}
+            {fillTokens(data.heading, tokens)}
           </div>
           <Link href={data.cta_href} className="text-sm font-bold text-[var(--dwd-accent-1)] hover:text-[var(--dwd-accent-1-hover)]">
             {data.cta_label}

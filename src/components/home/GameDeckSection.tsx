@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { Container } from 'components/ui/Container';
-import type { GameDeckData } from 'src/lib/homeContent';
+import { fillTokens, type GameDeckData, type ResidencyTokens } from 'src/lib/homeContent';
 import { photoFocusStyle } from 'src/lib/homePhotoFocus';
 
-export function GameDeckSection({ data }: { data: GameDeckData }) {
+export function GameDeckSection({ data, tokens }: { data: GameDeckData; tokens: ResidencyTokens }) {
   const isExternal = /^https?:\/\//.test(data.cta_href);
   return (
     <Container size="xl">
@@ -14,12 +14,12 @@ export function GameDeckSection({ data }: { data: GameDeckData }) {
         <div className="absolute -top-3.5 right-16 w-6 h-6 rounded-full bg-[var(--dwd-accent-1)] border-2 border-[var(--dwd-ink)]" />
         <div className="flex-1 min-w-[280px]">
           <div className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--dwd-bg)] opacity-85 mb-3.5">
-            {data.eyebrow}
+            {fillTokens(data.eyebrow, tokens)}
           </div>
           <div className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-2xl md:text-[30px] text-[var(--dwd-bg)] mb-3.5">
-            {data.headline}
+            {fillTokens(data.headline, tokens)}
           </div>
-          <p className="text-base leading-relaxed text-[var(--dwd-bg)] opacity-90 max-w-md mb-5">{data.body}</p>
+          <p className="text-base leading-relaxed text-[var(--dwd-bg)] opacity-90 max-w-md mb-5">{fillTokens(data.body, tokens)}</p>
           <div className="flex gap-2.5 flex-wrap mb-6">
             {data.chips.map((name) => (
               <span
@@ -61,7 +61,7 @@ export function GameDeckSection({ data }: { data: GameDeckData }) {
         ) : (
           <div className="w-full sm:w-[280px] h-[180px] sm:h-[200px] flex-shrink-0 flex items-center justify-center text-center p-4 -rotate-[1.8deg] bg-[var(--dwd-bg)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]">
             <span className="text-[13px] font-bold uppercase tracking-wider text-[var(--dwd-accent-1)]">
-              {data.photo_placeholder_text}
+              {fillTokens(data.photo_placeholder_text, tokens)}
             </span>
           </div>
         )}

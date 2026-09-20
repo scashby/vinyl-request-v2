@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Container } from 'components/ui/Container';
-import type { DialoguesTeaserData } from 'src/lib/homeContent';
+import { fillTokens, type DialoguesTeaserData, type ResidencyTokens } from 'src/lib/homeContent';
 import DialoguesPostImage from 'src/components/DialoguesPostImage';
 
 interface BlogPost {
@@ -29,9 +29,11 @@ const extractFirstImg = (post: BlogPost): string | null => {
 
 export function DialoguesTeaserSection({
   data,
+  tokens,
   posts,
 }: {
   data: DialoguesTeaserData;
+  tokens: ResidencyTokens;
   posts: BlogPost[];
 }) {
   if (posts.length === 0) return null;
@@ -41,7 +43,7 @@ export function DialoguesTeaserSection({
       <div className="mb-16 md:mb-20">
         <div className="flex items-baseline justify-between mb-7">
           <div className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-2xl md:text-3xl text-[var(--dwd-ink)]">
-            {data.heading}
+            {fillTokens(data.heading, tokens)}
           </div>
           <Link href={data.cta_href} className="text-sm font-bold text-[var(--dwd-accent-1)] hover:text-[var(--dwd-accent-1-hover)]">
             {data.cta_label}

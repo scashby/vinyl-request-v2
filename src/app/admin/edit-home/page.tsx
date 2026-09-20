@@ -12,6 +12,7 @@ import {
   DEFAULT_SECTIONS,
   SECTION_LABELS,
   SECTION_TYPES,
+  residencySeasonLabel,
   type BioData,
   type ConnectData,
   type DialoguesTeaserData,
@@ -345,13 +346,22 @@ export default function EditHomePage() {
         saving={savingType === "hero"}
         saved={savedType === "hero"}
       >
-        <Field label="Eyebrow" value={hero.data.eyebrow} onChange={(v) => setHero({ ...hero, data: { ...hero.data, eyebrow: v } })} />
         <Field
-          label="Headline (use {night} / {venue} to pull from Residency below)"
+          label="Eyebrow (use {night} / {venue} / {season} to pull from Residency below)"
+          value={hero.data.eyebrow}
+          onChange={(v) => setHero({ ...hero, data: { ...hero.data, eyebrow: v } })}
+        />
+        <Field
+          label="Headline (use {night} / {venue} / {season} to pull from Residency below)"
           value={hero.data.headline}
           onChange={(v) => setHero({ ...hero, data: { ...hero.data, headline: v } })}
         />
-        <Field label="Subhead" value={hero.data.subhead} onChange={(v) => setHero({ ...hero, data: { ...hero.data, subhead: v } })} multiline />
+        <Field
+          label="Subhead (use {night} / {venue} / {season})"
+          value={hero.data.subhead}
+          onChange={(v) => setHero({ ...hero, data: { ...hero.data, subhead: v } })}
+          multiline
+        />
         <div className="grid grid-cols-2 gap-4">
           <Field label="Primary button label" value={hero.data.primary_cta_label} onChange={(v) => setHero({ ...hero, data: { ...hero.data, primary_cta_label: v } })} />
           <Field label="Primary button link" value={hero.data.primary_cta_href} onChange={(v) => setHero({ ...hero, data: { ...hero.data, primary_cta_href: v } })} />
@@ -368,7 +378,7 @@ export default function EditHomePage() {
           onClear={() => setHero({ ...hero, data: { ...hero.data, photo_url: "" } })}
         />
         <Field
-          label="Placeholder text (shown until a photo is added above)"
+          label="Placeholder text (shown until a photo is added above; use {night} / {venue} / {season})"
           value={hero.data.photo_placeholder_text}
           onChange={(v) => setHero({ ...hero, data: { ...hero.data, photo_placeholder_text: v } })}
         />
@@ -386,8 +396,38 @@ export default function EditHomePage() {
           <Field label="Night" value={residency.data.night} onChange={(v) => setResidency({ ...residency, data: { ...residency.data, night: v } })} />
           <Field label="Venue" value={residency.data.venue} onChange={(v) => setResidency({ ...residency, data: { ...residency.data, venue: v } })} />
         </div>
-        <Field label="Eyebrow label" value={residency.data.eyebrow} onChange={(v) => setResidency({ ...residency, data: { ...residency.data, eyebrow: v } })} />
-        <Field label="Description" value={residency.data.description} onChange={(v) => setResidency({ ...residency, data: { ...residency.data, description: v } })} multiline />
+        <div className="grid grid-cols-2 gap-4">
+          <Field
+            label="Season start (e.g. November; blank if year-round)"
+            value={residency.data.season_start}
+            onChange={(v) => setResidency({ ...residency, data: { ...residency.data, season_start: v } })}
+          />
+          <Field
+            label="Season end (e.g. April)"
+            value={residency.data.season_end}
+            onChange={(v) => setResidency({ ...residency, data: { ...residency.data, season_end: v } })}
+          />
+        </div>
+        <p className="text-xs text-gray-500 -mt-2">
+          Fills the {"{season}"} token below and everywhere else on the page (e.g. &ldquo;{residencySeasonLabel(residency.data) || 'November – April'}&rdquo;).
+          Leave both blank to drop the token from any copy that uses it.
+        </p>
+        <Field
+          label="Eyebrow label (use {night} / {venue} / {season})"
+          value={residency.data.eyebrow}
+          onChange={(v) => setResidency({ ...residency, data: { ...residency.data, eyebrow: v } })}
+        />
+        <Field
+          label="Headline (use {night} / {venue} / {season})"
+          value={residency.data.headline}
+          onChange={(v) => setResidency({ ...residency, data: { ...residency.data, headline: v } })}
+        />
+        <Field
+          label="Description (use {night} / {venue} / {season})"
+          value={residency.data.description}
+          onChange={(v) => setResidency({ ...residency, data: { ...residency.data, description: v } })}
+          multiline
+        />
         <div className="grid grid-cols-2 gap-4">
           <Field label="Button label" value={residency.data.cta_label} onChange={(v) => setResidency({ ...residency, data: { ...residency.data, cta_label: v } })} />
           <Field label="Button link (e.g. a maps URL)" value={residency.data.cta_href} onChange={(v) => setResidency({ ...residency, data: { ...residency.data, cta_href: v } })} />
@@ -402,13 +442,17 @@ export default function EditHomePage() {
         saving={savingType === "events_strip"}
         saved={savedType === "events_strip"}
       >
-        <Field label="Heading" value={eventsStrip.data.heading} onChange={(v) => setEventsStrip({ ...eventsStrip, data: { ...eventsStrip.data, heading: v } })} />
+        <Field
+          label="Heading (use {night} / {venue} / {season})"
+          value={eventsStrip.data.heading}
+          onChange={(v) => setEventsStrip({ ...eventsStrip, data: { ...eventsStrip.data, heading: v } })}
+        />
         <div className="grid grid-cols-2 gap-4">
           <Field label="Link label" value={eventsStrip.data.cta_label} onChange={(v) => setEventsStrip({ ...eventsStrip, data: { ...eventsStrip.data, cta_label: v } })} />
           <Field label="Link href" value={eventsStrip.data.cta_href} onChange={(v) => setEventsStrip({ ...eventsStrip, data: { ...eventsStrip.data, cta_href: v } })} />
         </div>
         <Field
-          label="Empty state text (shown when there are no upcoming events; use {night} / {venue})"
+          label="Empty state text (shown when there are no upcoming events; use {night} / {venue} / {season})"
           value={eventsStrip.data.empty_state_text}
           onChange={(v) => setEventsStrip({ ...eventsStrip, data: { ...eventsStrip.data, empty_state_text: v } })}
           multiline
@@ -423,8 +467,17 @@ export default function EditHomePage() {
         saving={savingType === "bio"}
         saved={savedType === "bio"}
       >
-        <Field label="Eyebrow label" value={bio.data.eyebrow} onChange={(v) => setBio({ ...bio, data: { ...bio.data, eyebrow: v } })} />
-        <Field label="Bio text (use {venue})" value={bio.data.body} onChange={(v) => setBio({ ...bio, data: { ...bio.data, body: v } })} multiline />
+        <Field
+          label="Eyebrow label (use {night} / {venue} / {season})"
+          value={bio.data.eyebrow}
+          onChange={(v) => setBio({ ...bio, data: { ...bio.data, eyebrow: v } })}
+        />
+        <Field
+          label="Bio text (use {night} / {venue} / {season})"
+          value={bio.data.body}
+          onChange={(v) => setBio({ ...bio, data: { ...bio.data, body: v } })}
+          multiline
+        />
       </SectionCard>
 
       <SectionCard
@@ -435,9 +488,22 @@ export default function EditHomePage() {
         saving={savingType === "game_deck"}
         saved={savedType === "game_deck"}
       >
-        <Field label="Eyebrow label" value={gameDeck.data.eyebrow} onChange={(v) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, eyebrow: v } })} />
-        <Field label="Headline" value={gameDeck.data.headline} onChange={(v) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, headline: v } })} />
-        <Field label="Body" value={gameDeck.data.body} onChange={(v) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, body: v } })} multiline />
+        <Field
+          label="Eyebrow label (use {night} / {venue} / {season})"
+          value={gameDeck.data.eyebrow}
+          onChange={(v) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, eyebrow: v } })}
+        />
+        <Field
+          label="Headline (use {night} / {venue} / {season})"
+          value={gameDeck.data.headline}
+          onChange={(v) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, headline: v } })}
+        />
+        <Field
+          label="Body (use {night} / {venue} / {season})"
+          value={gameDeck.data.body}
+          onChange={(v) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, body: v } })}
+          multiline
+        />
         <div>
           <label className={labelClass}>Game chips (one per line)</label>
           <textarea
@@ -463,7 +529,7 @@ export default function EditHomePage() {
           onClear={() => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_url: "" } })}
         />
         <Field
-          label="Placeholder text (shown until a photo is added above)"
+          label="Placeholder text (shown until a photo is added above; use {night} / {venue} / {season})"
           value={gameDeck.data.photo_placeholder_text}
           onChange={(v) => setGameDeck({ ...gameDeck, data: { ...gameDeck.data, photo_placeholder_text: v } })}
         />
@@ -477,7 +543,11 @@ export default function EditHomePage() {
         saving={savingType === "dialogues_teaser"}
         saved={savedType === "dialogues_teaser"}
       >
-        <Field label="Heading" value={dialoguesTeaser.data.heading} onChange={(v) => setDialoguesTeaser({ ...dialoguesTeaser, data: { ...dialoguesTeaser.data, heading: v } })} />
+        <Field
+          label="Heading (use {night} / {venue} / {season})"
+          value={dialoguesTeaser.data.heading}
+          onChange={(v) => setDialoguesTeaser({ ...dialoguesTeaser, data: { ...dialoguesTeaser.data, heading: v } })}
+        />
         <div className="grid grid-cols-2 gap-4">
           <Field label="Link label" value={dialoguesTeaser.data.cta_label} onChange={(v) => setDialoguesTeaser({ ...dialoguesTeaser, data: { ...dialoguesTeaser.data, cta_label: v } })} />
           <Field label="Link href" value={dialoguesTeaser.data.cta_href} onChange={(v) => setDialoguesTeaser({ ...dialoguesTeaser, data: { ...dialoguesTeaser.data, cta_href: v } })} />
@@ -492,8 +562,16 @@ export default function EditHomePage() {
         saving={savingType === "connect"}
         saved={savedType === "connect"}
       >
-        <Field label="Heading" value={connect.data.heading} onChange={(v) => setConnect({ ...connect, data: { ...connect.data, heading: v } })} />
-        <Field label="Subhead" value={connect.data.subhead} onChange={(v) => setConnect({ ...connect, data: { ...connect.data, subhead: v } })} />
+        <Field
+          label="Heading (use {night} / {venue} / {season})"
+          value={connect.data.heading}
+          onChange={(v) => setConnect({ ...connect, data: { ...connect.data, heading: v } })}
+        />
+        <Field
+          label="Subhead (use {night} / {venue} / {season})"
+          value={connect.data.subhead}
+          onChange={(v) => setConnect({ ...connect, data: { ...connect.data, subhead: v } })}
+        />
         <div>
           <label className={labelClass}>Social links (also used in the site footer)</label>
           <div className="space-y-2">
