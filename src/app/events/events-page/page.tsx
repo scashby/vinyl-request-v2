@@ -2,10 +2,16 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { supabase } from "src/lib/supabaseClient";
 import { formatEventText } from "src/utils/textFormatter";
 import { Container } from "components/ui/Container";
+import { useActiveTheme } from "src/lib/useActiveTheme";
+import {
+  cropRectImageStyle,
+  getImageCropFromTags,
+  IMAGE_FOCUS_COVER_TAG_PREFIX,
+  IMAGE_FOCUS_SQUARE_TAG_PREFIX,
+} from "src/lib/imageCrop";
 
 interface Event {
   id: number;
@@ -13,6 +19,7 @@ interface Event {
   date: string;
   location?: string;
   image_url?: string;
+  image_url_square?: string;
   is_featured_grid?: boolean;
   featured_priority?: number | string | null;
   allowed_tags?: string[] | string | null;
@@ -39,10 +46,7 @@ interface DateObj {
 }
 
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
-const IMAGE_FOCUS_COVER_TAG_PREFIX = 'image_focus_cover:';
-const IMAGE_FOCUS_SQUARE_TAG_PREFIX = 'image_focus_square:';
-
-type ImageFocusPoint = { x: number; y: number };
+const CARD_TILT_VARS = ["--dwd-tilt-1", "--dwd-tilt-2", "--dwd-tilt-3", "--dwd-tilt-4"];
 
 const normalizeStringArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value;
@@ -64,26 +68,12 @@ const getDisplayTitle = (event: Event): string => {
   return event.title;
 };
 
-const clampFocusValue = (value: number): number => {
-  if (!Number.isFinite(value)) return 50;
-  return Math.min(100, Math.max(0, Math.round(value)));
-};
-
-const getImageFocusFromTags = (tagsValue: unknown, prefix: string): ImageFocusPoint => {
-  const tags = normalizeStringArray(tagsValue);
-  const raw = getTagValue(tags, prefix);
-  if (!raw) return { x: 50, y: 50 };
-  const [xRaw, yRaw] = raw.split(':');
-  return {
-    x: clampFocusValue(Number.parseFloat(xRaw ?? '50')),
-    y: clampFocusValue(Number.parseFloat(yRaw ?? '50')),
-  };
-};
 
 export default function Page() {
   const [events, setEvents] = useState<Event[]>([]);
   const [pastDJSets, setPastDJSets] = useState<DJSet[]>([]);
   const [loading, setLoading] = useState(true);
+  const { cssVars } = useActiveTheme();
 
   useEffect(() => {
     const load = async () => {
@@ -205,14 +195,16 @@ export default function Page() {
     const tba = !date || date === "" || date === "9999-12-31";
 
     return (
-      <div className="bg-black border-2 border-[#00c4ff] rounded-lg p-2 text-center min-w-[84px]">
-        <div className="text-[#00c4ff] text-[11px] font-extrabold tracking-widest mb-0.5">
+      <div
+        className="text-center min-w-[84px] p-2 bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] rounded-lg"
+      >
+        <div className="text-[var(--dwd-accent-1)] text-[11px] font-extrabold tracking-widest mb-0.5">
           {tba ? "TBA" : d.wk}
         </div>
-        <div className="text-white text-3xl font-extrabold leading-none">
+        <div className="text-3xl font-extrabold leading-none">
           {tba ? "" : d.day}
         </div>
-        <div className="text-[#00c4ff] text-[11px] font-extrabold tracking-widest mt-0.5">
+        <div className="text-[var(--dwd-accent-1)] text-[11px] font-extrabold tracking-widest mt-0.5">
           {tba ? "" : d.mon}
         </div>
       </div>
@@ -222,46 +214,46 @@ export default function Page() {
   const SectionTitle = ({ text }: { text: string }) => (
     <div className="mb-6">
       <div className="flex items-center gap-3">
-        <div className="w-3.5 h-3.5 rounded-sm bg-[#00c4ff] rotate-45" />
-        <h2 className="text-white text-4xl md:text-5xl font-black tracking-widest uppercase m-0">
+        <div className="w-3.5 h-3.5 rounded-sm rotate-45 bg-[var(--dwd-accent-1)]" />
+        <h2 className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-3xl md:text-4xl m-0">
           {text}
         </h2>
       </div>
-      <div className="h-1.5 w-44 bg-[#00c4ff] rounded-full mt-3" />
+      <div className="h-1.5 w-44 rounded-full mt-3 bg-[var(--dwd-accent-1)]" />
     </div>
   );
 
   return (
-    <div className="bg-white min-h-screen">
-      {/* Hero Header */}
-      <header className="relative h-[300px] flex items-center justify-center bg-gray-900">
-        <div 
-          className="absolute inset-0 bg-cover bg-center opacity-50"
-          style={{ backgroundImage: "url('/images/event-header-still.jpg')" }}
-        />
-        <div className="relative z-10 px-8 py-4 bg-black/40 rounded-xl">
-          <h1 className="text-4xl md:text-5xl font-bold text-white font-serif-display text-center">
+    <div
+      className="min-h-screen font-[family-name:var(--dwd-font-body)] bg-[var(--dwd-bg)] text-[var(--dwd-ink)]"
+      style={cssVars}
+    >
+      <Container size="xl">
+        <div className="pt-16 pb-10 md:pt-20">
+          <div className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-4xl md:text-5xl mb-3">
             Upcoming Vinyl Nights
-          </h1>
+          </div>
+          <p className="text-lg text-[var(--dwd-ink-soft)] max-w-xl">
+            Every standing residency night, guest set, and private gig on the calendar.
+          </p>
         </div>
-      </header>
+      </Container>
 
-      <main className="bg-black text-white pb-20">
+      <main className="pb-20">
         {loading ? (
-          <div className="py-12 text-center text-white text-lg">
-            Loading…
+          <div className="py-12 text-center text-lg text-[var(--dwd-ink-faint)]">
+            Loading&hellip;
           </div>
         ) : (
           <div data-secwrap="sections">
             {/* SECTION 1 — UP NEXT */}
             {upNext.length > 0 && (
-              <section className="bg-gradient-to-b from-[#141414] to-black py-12 border-b-4 border-[#00c4ff]">
+              <section className="pb-4">
                 <Container size="xl">
                   <SectionTitle text="Up Next" />
 
-                  <div className={`grid gap-7 ${upNext.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
-                    {upNext.map((ev) => {
-                      // FIX: Updated placeholder path
+                  <div className={`grid gap-7 mb-4 ${upNext.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+                    {upNext.map((ev, i) => {
                       const img =
                         ev.image_url || "/images/coverplaceholder.png";
                       const d = compactDate(ev.date);
@@ -270,7 +262,7 @@ export default function Page() {
                         ev.date === "" ||
                         ev.date === "9999-12-31";
                       const displayTitle = getDisplayTitle(ev);
-                      const coverFocus = getImageFocusFromTags(
+                      const coverCrop = getImageCropFromTags(
                         ev.allowed_tags,
                         IMAGE_FOCUS_COVER_TAG_PREFIX
                       );
@@ -281,26 +273,27 @@ export default function Page() {
                           href={`/events/event-detail/${ev.id}`}
                           className="block group"
                         >
-                          <div className="bg-[#222] rounded-xl overflow-hidden border-[3px] border-[#00c4ff] transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_14px_36px_rgba(0,196,255,0.35)]">
-                            <div className="relative w-full aspect-video">
-                              <Image
-                                src={img}
-                                alt={displayTitle}
-                                fill
-                                sizes="(max-width:900px) 100vw, 700px"
-                                className="object-cover"
-                                style={{ objectPosition: `${coverFocus.x}% ${coverFocus.y}%` }}
-                                unoptimized
-                              />
+                          <div
+                            className="overflow-hidden transition-transform duration-300 group-hover:!rotate-0 group-hover:-translate-y-1.5 bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)]"
+                            style={{ transform: `rotate(var(${CARD_TILT_VARS[i % CARD_TILT_VARS.length]}))` }}
+                          >
+                            <div className="relative w-full aspect-video overflow-hidden">
+                              {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
+                              <img src={img} alt={displayTitle} style={cropRectImageStyle(coverCrop)} />
                             </div>
                             <div className="p-6 pb-7">
-                              <div className={`inline-block px-4 py-2.5 rounded-lg font-black mb-4 ${
-                                tba ? "bg-gray-500 text-white" : "bg-[#00c4ff] text-black"
-                              }`}>
+                              <div
+                                className="inline-block px-4 py-2.5 rounded-lg font-black mb-4"
+                                style={
+                                  tba
+                                    ? { background: 'var(--dwd-ink-faint)', color: 'var(--dwd-bg)' }
+                                    : { background: 'var(--dwd-accent-1)', color: 'var(--dwd-bg)' }
+                                }
+                              >
                                 {tba ? "TBA" : `${d.wk} ${d.mon} ${d.day}`}
                               </div>
                               <h3
-                                className="text-white text-3xl font-black leading-tight m-0"
+                                className="text-3xl font-black leading-tight m-0"
                                 dangerouslySetInnerHTML={{
                                   __html: formatEventText(displayTitle),
                                 }}
@@ -317,17 +310,16 @@ export default function Page() {
 
             {/* SECTION 2 — FEATURED GRID */}
             {featuredGrid.length > 0 && (
-              <section className="bg-black py-12 border-b-2 border-[#1f1f1f]">
+              <section className="py-8">
                 <Container size="xl">
                   <SectionTitle text="Featured" />
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                     {featuredGrid.map((e) => {
-                      // FIX: Updated placeholder path
-                      const img = e.image_url || "/images/coverplaceholder.png";
+                      const img = e.image_url_square || e.image_url || "/images/coverplaceholder.png";
                       const d = compactDate(e.date);
                       const tba = !e.date || e.date === "" || e.date === "9999-12-31";
                       const displayTitle = getDisplayTitle(e);
-                      const squareFocus = getImageFocusFromTags(
+                      const squareCrop = getImageCropFromTags(
                         e.allowed_tags,
                         IMAGE_FOCUS_SQUARE_TAG_PREFIX
                       );
@@ -338,24 +330,17 @@ export default function Page() {
                           href={`/events/event-detail/${e.id}`}
                           className="block group"
                         >
-                          <div className="bg-[#1b1b1b] rounded-lg overflow-hidden border-2 border-[#262626] flex flex-col transition-all duration-200 group-hover:-translate-y-1 group-hover:border-[#00c4ff]">
-                            <div className="relative w-full pt-[100%]">
-                              <Image
-                                src={img}
-                                alt={displayTitle}
-                                fill
-                                sizes="280px"
-                                className="object-cover"
-                                style={{ objectPosition: `${squareFocus.x}% ${squareFocus.y}%` }}
-                                unoptimized
-                              />
+                          <div className="overflow-hidden flex flex-col transition-all duration-200 group-hover:-translate-y-1 bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] rounded-lg">
+                            <div className="relative w-full pt-[100%] overflow-hidden">
+                              {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
+                              <img src={img} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
                             </div>
                             <div className="p-4">
                               <h4
-                                className="text-white text-lg font-extrabold leading-tight min-h-[2.5rem] mb-2"
+                                className="text-lg font-extrabold leading-tight min-h-[2.5rem] mb-2"
                                 dangerouslySetInnerHTML={{ __html: formatEventText(displayTitle) }}
                               />
-                              <div className="text-[#00d9ff] font-extrabold text-sm">
+                              <div className="font-extrabold text-sm text-[var(--dwd-accent-1)]">
                                 {tba ? "TBA" : `${d.mon} ${d.day}`}
                               </div>
                             </div>
@@ -369,7 +354,7 @@ export default function Page() {
             )}
 
             {/* SECTION 3 — UPCOMING SHOWS + SIDEBAR */}
-            <section className="bg-[#0d0d0d] py-16">
+            <section className="py-8">
               <Container size="xl">
                 <SectionTitle text="Upcoming Shows" />
 
@@ -377,11 +362,10 @@ export default function Page() {
                   {/* LEFT COLUMN: list of upcoming events */}
                   <div className="space-y-4">
                     {events.map((e) => {
-                      // FIX: Updated placeholder path
                       const img =
-                        e.image_url || "/images/coverplaceholder.png";
+                        e.image_url_square || e.image_url || "/images/coverplaceholder.png";
                       const displayTitle = getDisplayTitle(e);
-                      const squareFocus = getImageFocusFromTags(
+                      const squareCrop = getImageCropFromTags(
                         e.allowed_tags,
                         IMAGE_FOCUS_SQUARE_TAG_PREFIX
                       );
@@ -392,35 +376,28 @@ export default function Page() {
                           href={`/events/event-detail/${e.id}`}
                           className="block group"
                         >
-                          <div className="grid grid-cols-[100px_1fr] md:grid-cols-[100px_150px_1fr_auto] gap-4 items-center bg-[#151515] p-4 border-b border-[#262626] border-l-4 border-l-transparent hover:bg-[#1f1f1f] hover:border-l-[#00c4ff] transition-colors duration-200">
+                          <div className="grid grid-cols-[100px_1fr] md:grid-cols-[100px_150px_1fr_auto] gap-4 items-center p-4 border-b border-l-4 border-l-transparent transition-colors duration-200 bg-[var(--dwd-bg-card)] border-[var(--dwd-ink)]/10 hover:border-l-[var(--dwd-accent-1)]">
                             <DateBox date={e.date} />
-                            
+
                             <div className="relative w-full h-[150px] rounded-md overflow-hidden hidden md:block">
-                              <Image
-                                src={img}
-                                alt={displayTitle}
-                                fill
-                                sizes="150px"
-                                className="object-cover"
-                                style={{ objectPosition: `${squareFocus.x}% ${squareFocus.y}%` }}
-                                unoptimized
-                              />
+                              {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
+                              <img src={img} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
                             </div>
 
                             <div className="min-w-0 col-span-1 md:col-span-1">
                               <h3
-                                className="text-white text-xl font-extrabold leading-tight mb-1"
+                                className="text-xl font-extrabold leading-tight mb-1"
                                 dangerouslySetInnerHTML={{ __html: formatEventText(displayTitle) }}
                               />
                               {e.location && (
-                                <div className="text-[#9aa3ad] text-sm mt-1">
-                                  📍 {e.location}
+                                <div className="text-sm mt-1 text-[var(--dwd-ink-faint)]">
+                                  {e.location}
                                 </div>
                               )}
                             </div>
 
                             <div className="hidden md:block">
-                              <span className="bg-[#00c4ff] text-black px-4 py-2 rounded-md font-black text-sm uppercase whitespace-nowrap">
+                              <span className="px-4 py-2 rounded-full font-black text-sm uppercase whitespace-nowrap bg-[var(--dwd-accent-1)] text-[var(--dwd-bg)]">
                                 More Info
                               </span>
                             </div>
@@ -431,9 +408,9 @@ export default function Page() {
                   </div>
 
                   {/* RIGHT COLUMN: Just Announced + ads */}
-                  <aside className="bg-[#121212] border-2 border-[#262626] rounded-xl p-5 self-start">
+                  <aside className="p-5 self-start bg-[var(--dwd-bg-card)] [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)]">
                     {/* Just Announced header */}
-                    <div className="bg-gradient-to-r from-[#00c4ff] to-[#34dfff] text-black p-2.5 rounded-lg text-center font-black tracking-wide uppercase mb-4 shadow-[0_6px_20px_rgba(0,196,255,0.2)]">
+                    <div className="p-2.5 rounded-lg text-center font-black tracking-wide uppercase mb-4 bg-[var(--dwd-accent-1)] text-[var(--dwd-bg)]">
                       Just Announced
                     </div>
 
@@ -446,53 +423,7 @@ export default function Page() {
                           e.date === "" ||
                           e.date === "9999-12-31";
                         const displayTitle = getDisplayTitle(e);
-
-                        const palettes = [
-                          {
-                            bar: "#00c4ff",
-                            bg: "linear-gradient(135deg,#0b1220,#0f1a2e)",
-                            border: "#1c2a44",
-                            pill: "#00c4ff",
-                            pillText: "#000",
-                          },
-                          {
-                            bar: "#f59e0b",
-                            bg: "linear-gradient(135deg,#22160a,#2b1b0b)",
-                            border: "#3b2612",
-                            pill: "#f59e0b",
-                            pillText: "#000",
-                          },
-                          {
-                            bar: "#22c55e",
-                            bg: "linear-gradient(135deg,#0c1f15,#0e2a1a)",
-                            border: "#1b3b2a",
-                            pill: "#22c55e",
-                            pillText: "#000",
-                          },
-                          {
-                            bar: "#a78bfa",
-                            bg: "linear-gradient(135deg,#1a1430,#221b45)",
-                            border: "#2d2361",
-                            pill: "#a78bfa",
-                            pillText: "#000",
-                          },
-                          {
-                            bar: "#ef4444",
-                            bg: "linear-gradient(135deg,#2b1212,#3a1717)",
-                            border: "#512020",
-                            pill: "#ef4444",
-                            pillText: "#000",
-                          },
-                          {
-                            bar: "#06b6d4",
-                            bg: "linear-gradient(135deg,#062329,#082f36)",
-                            border: "#10424b",
-                            pill: "#06b6d4",
-                            pillText: "#000",
-                          },
-                        ];
-
-                        const p = palettes[idx % palettes.length];
+                        const accentVar = ["--dwd-accent-1", "--dwd-accent-2", "--dwd-accent-3"][idx % 3];
 
                         return (
                           <Link
@@ -500,61 +431,27 @@ export default function Page() {
                             href={`/events/event-detail/${e.id}`}
                             className="block group"
                           >
-                            <div 
-                              className={`relative border rounded-xl p-4 overflow-hidden transition-all duration-150 group-hover:-translate-y-0.5 group-hover:shadow-[0_16px_36px_rgba(0,196,255,0.22)] shadow-[0_8px_28px_rgba(0,0,0,0.35)]`}
-                              style={{ background: p.bg, borderColor: p.border }}
+                            <div
+                              className="relative p-4 overflow-hidden transition-transform duration-150 group-hover:-translate-y-0.5 bg-[var(--dwd-bg)] [border:var(--dwd-card-border)] rounded-lg"
                             >
-                              <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: p.bar }} />
+                              <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: `var(${accentVar})` }} />
                               <h4
-                                style={{
-                                  color: "#fff",
-                                  fontSize: "1rem",
-                                  fontWeight: 900,
-                                  lineHeight: 1.25,
-                                  margin: "0 0 .45rem",
-                                  textShadow:
-                                    "0 1px 0 rgba(0,0,0,.25)",
-                                }}
+                                className="text-base font-black leading-tight mb-2 pl-2"
                                 dangerouslySetInnerHTML={{
                                   __html: formatEventText(displayTitle),
                                 }}
                               />
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: ".5rem",
-                                }}
-                              >
+                              <div className="flex items-center gap-2 pl-2">
                                 <div
-                                  style={{
-                                    background: p.pill,
-                                    color: p.pillText,
-                                    fontWeight: 900,
-                                    fontSize: ".75rem",
-                                    borderRadius: 999,
-                                    padding:
-                                      ".25rem .55rem",
-                                    minWidth: 72,
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    textAlign: "center",
-                                  }}
+                                  className="font-black text-xs rounded-full px-2.5 py-1 min-w-[72px] inline-flex items-center justify-center text-center"
+                                  style={{ background: `var(${accentVar})`, color: 'var(--dwd-bg)' }}
                                 >
                                   {tba
                                     ? "TBA"
                                     : `${d.wk} ${d.mon} ${d.day}`}
                                 </div>
-                                <div
-                                  style={{
-                                    color:
-                                      "rgba(255,255,255,.7)",
-                                    fontSize: ".8rem",
-                                  }}
-                                >
-                                  {e.location ||
-                                    "New date added"}
+                                <div className="text-xs text-[var(--dwd-ink-faint)]">
+                                  {e.location || "New date added"}
                                 </div>
                               </div>
                             </div>
@@ -564,85 +461,64 @@ export default function Page() {
                     </div>
 
                     {/* AD: Book DJ Gigs */}
-                    <div className="relative bg-[radial-gradient(circle_at_30%_20%,#ffe8a3_0%,#ffd15e_40%,#ff9a3c_60%,#ff6b3d_100%)] rounded-2xl p-4 mb-4 shadow-[0_12px_28px_rgba(0,0,0,0.35)] overflow-hidden group">
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.4),rgba(255,255,255,0)_35%)]" />
-                      <div className="absolute inset-0 bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:6px_6px] opacity-[0.06]" />
-                      <div className="absolute top-[-18px] right-[-32px] rotate-[15deg] bg-black text-white px-4 py-1.5 font-black tracking-widest uppercase shadow-[0_8px_20px_rgba(0,0,0,0.4)] text-sm">
-                        Limited Dates
+                    <div className="p-4 mb-4 bg-[var(--dwd-accent-3)] [border:var(--dwd-card-border)] rounded-2xl">
+                      <div className="text-[1.4rem] font-black uppercase tracking-[1.5px] text-[var(--dwd-ink)]">
+                        Book DJ Gigs
                       </div>
-                      <div className="relative">
-                        <div className="text-[1.4rem] font-black uppercase text-[#111] tracking-[1.5px] drop-shadow-[0_1px_0_rgba(255,255,255,0.6)]">
-                          Book DJ Gigs
-                        </div>
-                        <div className="text-[#111] opacity-85 my-2 font-bold">
-                          Parties • Breweries • Pop-ups
-                        </div>
-                        <a
-                          href="https://calendly.com/deadwaxdialogues"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-block bg-[#111] text-[#ffd15e] px-4 py-3 rounded-md font-black -skew-x-12 shadow-[0_8px_20px_rgba(0,0,0,0.35)] hover:bg-black transition-colors"
-                        >
-                          <span className="inline-block skew-x-12">
-                            Book Online
-                          </span>
-                        </a>
+                      <div className="opacity-80 my-2 font-bold text-[var(--dwd-ink)]">
+                        Parties &middot; Breweries &middot; Pop-ups
                       </div>
+                      <a
+                        href="https://calendly.com/deadwaxdialogues"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block px-4 py-3 rounded-full font-black transition-colors bg-[var(--dwd-ink)] text-[var(--dwd-bg)] hover:opacity-90"
+                      >
+                        Book Online
+                      </a>
                     </div>
 
                     {/* AD: Latest DJ Sets */}
                     {latestSet && (
-                      <div className="relative bg-[#050510] rounded-2xl p-5 mb-4 shadow-[0_14px_34px_rgba(0,0,0,0.45)] overflow-hidden">
-                        {/* Background Gradients */}
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,0,204,0.35),transparent_60%)]" />
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(0,255,255,0.25),transparent_55%)]" />
-                        
-                        {/* Retro Grid Floor */}
-                        <div className="absolute left-[-20px] right-[-20px] bottom-0 h-[110px] [background-image:linear-gradient(rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:22px_22px] [transform:perspective(300px)_rotateX(60deg)] origin-bottom" />
-                        
-                        <div className="absolute top-2.5 right-3 text-2xl drop-shadow-[0_0_6px_rgba(0,255,255,0.6)]">
-                          📼
+                      <div className="p-5 mb-4 bg-[var(--dwd-ink)] rounded-2xl">
+                        <div className="font-black uppercase tracking-wider text-[var(--dwd-accent-2)]">
+                          Latest DJ Sets
                         </div>
-                        <div className="relative">
-                          <div className="text-cyan-400 font-black uppercase tracking-wider drop-shadow-[0_0_8px_rgba(0,255,255,0.8)]">
-                            Latest DJ Sets
-                          </div>
-                          <div className="text-gray-200 my-2 font-medium truncate">
-                            {latestSet.title}
-                          </div>
-                          <div className="flex gap-2.5">
-                            <a
-                              href={latestSet.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="bg-gradient-to-r from-cyan-400 to-fuchsia-500 text-black px-3.5 py-2 rounded-full font-black shadow-[0_0_20px_rgba(0,255,255,0.35)] hover:brightness-110 transition-all"
-                            >
-                              ▶ Play
-                            </a>
-                            <a
-                              href={latestSet.download_url || latestSet.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="bg-[#111] text-white px-3.5 py-2 rounded-full font-black border border-white/25 hover:bg-[#222] transition-colors"
-                            >
-                              ⬇ Download
-                            </a>
-                          </div>
+                        <div className="my-2 font-medium truncate text-[var(--dwd-bg)]">
+                          {latestSet.title}
+                        </div>
+                        <div className="flex gap-2.5">
+                          <a
+                            href={latestSet.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3.5 py-2 rounded-full font-black transition-opacity hover:opacity-90 bg-[var(--dwd-accent-1)] text-[var(--dwd-bg)]"
+                          >
+                            Play
+                          </a>
+                          <a
+                            href={latestSet.download_url || latestSet.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3.5 py-2 rounded-full font-black border transition-colors text-[var(--dwd-bg)] border-[var(--dwd-bg)]/25 hover:bg-[var(--dwd-bg)]/10"
+                          >
+                            Download
+                          </a>
                         </div>
                       </div>
                     )}
 
                     {/* AD: Merch */}
-                    <div className="bg-[repeating-linear-gradient(-45deg,#022c35,#022c35_10px,#053a44_10px,#053a44_20px)] border-2 border-[#0a4a57] rounded-[14px] p-5 shadow-[0_8px_26px_rgba(0,196,255,0.12)]">
-                      <div className="text-[#00e6ff] text-[1.35rem] font-black tracking-widest uppercase mb-1.5 drop-shadow-[0_1px_0_rgba(0,0,0,0.35)]">
+                    <div className="p-5 bg-[var(--dwd-accent-2)] rounded-2xl">
+                      <div className="text-[1.35rem] font-black tracking-widest uppercase mb-1.5 text-[var(--dwd-bg)]">
                         Merch
                       </div>
-                      <div className="text-[#b9e6ee] text-sm mb-3">
+                      <div className="text-sm mb-3 opacity-90 text-[var(--dwd-bg)]">
                         New designs / styles — new deals. Check it out!
                       </div>
                       <Link
                         href="/merch"
-                        className="inline-block bg-[#00e6ff] text-black px-3.5 py-2.5 rounded-lg font-black text-sm hover:bg-[#34efff] transition-colors"
+                        className="inline-block px-3.5 py-2.5 rounded-lg font-black text-sm transition-opacity hover:opacity-90 bg-[var(--dwd-bg)] text-[var(--dwd-ink)]"
                       >
                         View Merch
                       </Link>
@@ -657,4 +533,3 @@ export default function Page() {
     </div>
   );
 }
-// AUDIT: inspected, no changes.

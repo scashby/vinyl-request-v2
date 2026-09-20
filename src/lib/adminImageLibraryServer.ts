@@ -25,7 +25,9 @@ type ImageKindConfig = {
   bucketName: string;
   prefix: string;
   label: string;
-  eventField: "image_url" | "venue_logo_url";
+  // Only event-linked kinds have one; homepage photos live in
+  // homepage_sections, not the events table.
+  eventField?: "image_url" | "venue_logo_url";
 };
 
 type AssetIdentity = {
@@ -48,6 +50,11 @@ const IMAGE_KIND_CONFIG: Record<AdminImageKind, ImageKindConfig> = {
     prefix: "venue-logos",
     label: "Venue logo",
     eventField: "venue_logo_url",
+  },
+  homepageImage: {
+    bucketName: "homepage-images",
+    prefix: "homepage-images",
+    label: "Homepage photo",
   },
 };
 
@@ -171,14 +178,14 @@ async function fetchStorageAssets(imageKind: AdminImageKind) {
 async function fetchEventImageUsages() {
   const { data, error } = await supabaseAdmin
     .from("events")
-    .select("id, title, image_url, venue_logo_url")
+    .select("id, title, image_url, image_url_square, venue_logo_url")
     .order("date", { ascending: true });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return (data ?? []) as Pick<EventRow, "id" | "title" | "image_url" | "venue_logo_url">[];
+  return (data ?? []) as Pick<EventRow, "id" | "title" | "image_url" | "image_url_square" | "venue_logo_url">[];
 }
 
 async function fetchEventTypeConfig() {
@@ -215,10 +222,11 @@ function collectEventTypeUsage(
   typeConfig: EventTypeConfig,
   subtypeConfig?: EventSubtypeConfig
 ) {
+  // Event type/subtype defaults only carry a default event image these days —
+  // venue logos are per-event only (handled in buildUsageMap via event.venue_logo_url).
+  if (imageKind !== "eventImage") return;
   const defaults = subtypeConfig?.defaults ?? typeConfig.defaults;
-  const publicUrl = normalizeUrl(
-    imageKind === "eventImage" ? defaults?.image_url : defaults?.venue_logo_url
-  );
+  const publicUrl = normalizeUrl(defaults?.image_url);
   if (!publicUrl) return;
 
   const baseLabel = typeConfig.label || typeConfig.id || "Untitled type";
@@ -248,6 +256,15 @@ async function buildUsageMap() {
       addUsage(usageMap, "eventImage", eventImageUrl, {
         usageType: "event",
         label: event.title,
+        href: `/admin/manage-events/edit?id=${event.id}`,
+      });
+    }
+
+    const eventImageSquareUrl = normalizeUrl(event.image_url_square);
+    if (eventImageSquareUrl) {
+      addUsage(usageMap, "eventImage", eventImageSquareUrl, {
+        usageType: "event",
+        label: `${event.title} (square)`,
         href: `/admin/manage-events/edit?id=${event.id}`,
       });
     }

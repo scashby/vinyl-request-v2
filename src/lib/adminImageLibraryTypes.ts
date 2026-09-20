@@ -1,4 +1,4 @@
-export const ADMIN_IMAGE_KINDS = ["eventImage", "venueLogo"] as const;
+export const ADMIN_IMAGE_KINDS = ["eventImage", "venueLogo", "homepageImage"] as const;
 
 export type AdminImageKind = (typeof ADMIN_IMAGE_KINDS)[number];
 export type AdminImageSourceType = "supabase" | "external";

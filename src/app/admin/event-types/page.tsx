@@ -22,10 +22,7 @@ const ALL_TEMPLATE_FIELDS = [
   "image_url",
   "info",
   "info_url",
-  "queue",
   "recurrence",
-  "crate",
-  "formats",
 ];
 const FIELD_OPTIONS = [
   { id: "date", label: "Date" },
@@ -34,10 +31,7 @@ const FIELD_OPTIONS = [
   { id: "image_url", label: "Image" },
   { id: "info", label: "Description" },
   { id: "info_url", label: "Link" },
-  { id: "queue", label: "Queue" },
   { id: "recurrence", label: "Recurrence" },
-  { id: "crate", label: "Crate restriction" },
-  { id: "formats", label: "Allowed formats" },
 ];
 
 const fieldOrder = FIELD_OPTIONS.map((field) => field.id);
@@ -61,8 +55,6 @@ const createEmptySubtype = (): EventSubtypeConfig => ({
     time: "",
     location: "",
     image_url: "",
-    has_queue: false,
-    queue_types: [],
     is_recurring: false,
     recurrence_pattern: "weekly",
     recurrence_interval: 1,
@@ -81,8 +73,6 @@ const createEmptyType = (): EventTypeConfig => ({
     time: "",
     location: "",
     image_url: "",
-    has_queue: false,
-    queue_types: [],
     is_recurring: false,
     recurrence_pattern: "weekly",
     recurrence_interval: 1,
@@ -125,17 +115,11 @@ const resetDefaultsForField = (
   if (field === "image_url") nextDefaults.image_url = "";
   if (field === "info") nextDefaults.info = "";
   if (field === "info_url") nextDefaults.info_url = "";
-  if (field === "queue") {
-    nextDefaults.has_queue = false;
-    nextDefaults.queue_types = [];
-  }
   if (field === "recurrence") {
     nextDefaults.is_recurring = false;
     nextDefaults.recurrence_pattern = "weekly";
     nextDefaults.recurrence_interval = 1;
   }
-  if (field === "crate") nextDefaults.crate_id = null;
-  if (field === "formats") nextDefaults.allowed_formats = [];
   return nextDefaults;
 };
 
@@ -711,41 +695,6 @@ export default function Page() {
             </div>
           </div>
         )}
-        {fieldId === "queue" && (
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={defaults?.has_queue || false}
-                onChange={(e) => onUpdate({ has_queue: e.target.checked })}
-                className="h-4 w-4"
-              />
-              Enable queue
-            </label>
-            <div className="flex flex-wrap gap-3 text-sm text-gray-700">
-              {["side", "track", "album"].map((queueType) => {
-                const current = defaults?.queue_types || [];
-                const checked = current.includes(queueType);
-                return (
-                  <label key={queueType} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) => {
-                        const next = e.target.checked
-                          ? [...current, queueType]
-                          : current.filter((item) => item !== queueType);
-                        onUpdate({ queue_types: next });
-                      }}
-                      className="h-4 w-4"
-                    />
-                    {queueType}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        )}
         {fieldId === "recurrence" && (
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -784,33 +733,6 @@ export default function Page() {
               </div>
             </div>
           </div>
-        )}
-        {fieldId === "formats" && (
-          <input
-            value={(defaults?.allowed_formats || []).join(", ")}
-            onChange={(e) =>
-              onUpdate({
-                allowed_formats: e.target.value
-                  .split(",")
-                  .map((item) => item.trim())
-                  .filter(Boolean),
-              })
-            }
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            placeholder="lp, 7in, cassette"
-          />
-        )}
-        {fieldId === "crate" && (
-          <input
-            type="number"
-            min="0"
-            value={defaults?.crate_id ?? ""}
-            onChange={(e) =>
-              onUpdate({ crate_id: e.target.value ? parseInt(e.target.value) : null })
-            }
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            placeholder="Crate ID"
-          />
         )}
       </div>
     );
