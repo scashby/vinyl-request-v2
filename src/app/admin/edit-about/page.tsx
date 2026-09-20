@@ -17,6 +17,20 @@ interface Testimonial {
   author: string;
 }
 
+interface MostWantedItem {
+  id: number;
+  rank: number;
+  title: string;
+  url: string;
+}
+
+interface SocialEmbedItem {
+  id: number;
+  platform: string;
+  embed_html: string;
+  visible: boolean;
+}
+
 interface AboutContent {
   id?: number;
   main_description?: string;
@@ -64,9 +78,45 @@ export default function EditAboutPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
+  const [mostWanted, setMostWanted] = useState<MostWantedItem[]>([]);
+  const [savingWantedIndex, setSavingWantedIndex] = useState<number | null>(null);
+
+  const [socialEmbeds, setSocialEmbeds] = useState<SocialEmbedItem[]>([]);
+  const [savingEmbedIndex, setSavingEmbedIndex] = useState<number | null>(null);
+
   useEffect(() => {
     fetchAboutContent();
+    fetch('/api/most-wanted').then((res) => res.json()).then(setMostWanted);
+    fetch('/api/social-embeds').then((res) => res.json()).then(setSocialEmbeds);
   }, []);
+
+  const saveMostWantedItem = async (index: number) => {
+    setSavingWantedIndex(index);
+    const res = await fetch('/api/most-wanted', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(mostWanted[index]),
+    });
+    if (res.ok) setSavingWantedIndex(null);
+  };
+
+  const updateMostWantedField = (index: number, field: keyof MostWantedItem, value: string | number) => {
+    setMostWanted((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  };
+
+  const saveSocialEmbed = async (index: number) => {
+    setSavingEmbedIndex(index);
+    const res = await fetch('/api/social-embeds', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(socialEmbeds[index]),
+    });
+    if (res.ok) setSavingEmbedIndex(null);
+  };
+
+  const updateSocialEmbedField = (index: number, field: keyof SocialEmbedItem, value: string | boolean) => {
+    setSocialEmbeds((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  };
 
   const fetchAboutContent = async () => {
     setLoading(true);
@@ -587,6 +637,94 @@ There will be occasional silly interviews, commentary, and projects from the roa
             style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }}
           />
         </div>
+      </div>
+
+      <div style={{ marginBottom: '2rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
+        <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Most Wanted List</h3>
+        <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
+          Shown in the page sidebar, to the right of the content above. Rank controls display order (lowest first).
+          Each row saves on its own, separately from the &ldquo;Save Changes&rdquo; button below.
+        </p>
+        {mostWanted.map((item, i) => (
+          <div key={item.id} style={{
+            display: 'grid', gridTemplateColumns: '4rem 1fr 1fr auto', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem'
+          }}>
+            <input
+              type="number"
+              value={item.rank}
+              onChange={(e) => updateMostWantedField(i, 'rank', parseInt(e.target.value, 10))}
+              style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }}
+            />
+            <input
+              type="text"
+              placeholder="Title"
+              value={item.title}
+              onChange={(e) => updateMostWantedField(i, 'title', e.target.value)}
+              style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }}
+            />
+            <input
+              type="text"
+              placeholder="URL"
+              value={item.url}
+              onChange={(e) => updateMostWantedField(i, 'url', e.target.value)}
+              style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }}
+            />
+            <button
+              onClick={() => saveMostWantedItem(i)}
+              disabled={savingWantedIndex === i}
+              style={{
+                backgroundColor: '#2563eb', color: '#fff', padding: '0.5rem 1rem', border: 'none',
+                borderRadius: '4px', cursor: savingWantedIndex === i ? 'not-allowed' : 'pointer', fontWeight: 600
+              }}
+            >
+              {savingWantedIndex === i ? '…' : 'Save'}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginBottom: '2rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
+        <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Social Embeds</h3>
+        <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
+          Shown in the page sidebar&rsquo;s Recent Social Posts feed. Each row saves on its own, separately from the
+          &ldquo;Save Changes&rdquo; button below.
+        </p>
+        {socialEmbeds.map((embed, i) => (
+          <div key={embed.id} style={{
+            border: '1px solid #ddd', borderRadius: '6px', padding: '1rem', marginBottom: '1rem', backgroundColor: '#f9f9f9'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <strong>{embed.platform}</strong>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem' }}>
+                <input
+                  type="checkbox"
+                  checked={embed.visible}
+                  onChange={(e) => updateSocialEmbedField(i, 'visible', e.target.checked)}
+                />
+                Visible
+              </label>
+            </div>
+            <textarea
+              value={embed.embed_html}
+              onChange={(e) => updateSocialEmbedField(i, 'embed_html', e.target.value)}
+              rows={4}
+              style={{
+                width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px',
+                fontFamily: 'monospace', fontSize: '0.85rem', marginBottom: '0.5rem'
+              }}
+            />
+            <button
+              onClick={() => saveSocialEmbed(i)}
+              disabled={savingEmbedIndex === i}
+              style={{
+                backgroundColor: '#2563eb', color: '#fff', padding: '0.5rem 1rem', border: 'none',
+                borderRadius: '4px', cursor: savingEmbedIndex === i ? 'not-allowed' : 'pointer', fontWeight: 600
+              }}
+            >
+              {savingEmbedIndex === i ? '…' : 'Save'}
+            </button>
+          </div>
+        ))}
       </div>
 
       <div style={{ textAlign: 'center', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
