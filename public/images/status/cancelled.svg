@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 420" width="1000" height="420" role="img" aria-label="Cancelled">
-  <!-- Placeholder stamp art. Drop a replacement PNG/SVG in this folder and
-       point stampSrc in src/lib/eventStatus.ts at it to swap the artwork. -->
-  <g transform="rotate(-8 500 210)" fill="none" stroke="#e02a2a">
-    <rect x="40" y="88" width="920" height="244" rx="26" stroke-width="18"/>
-    <text x="500" y="268" fill="#e02a2a" stroke="none" font-family="'Arial Black','Arial Bold',Impact,Helvetica,sans-serif" font-weight="900" font-size="160" text-anchor="middle" textLength="760" lengthAdjust="spacingAndGlyphs">CANCELLED</text>
-  </g>
-</svg>

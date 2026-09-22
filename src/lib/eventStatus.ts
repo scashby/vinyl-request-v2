@@ -22,7 +22,8 @@ type EventStatusMeta = {
   shortNotice: string;
   // Overlay artwork laid over the event image. Swapping the stamp art is a
   // one-line change here — drop a replacement in public/images/status/ and
-  // point this at it.
+  // point this at it. Whatever it points at must have a transparent
+  // background: the stamp sits directly on the event photo.
   stampSrc: string;
   // Scrim painted between the photo and the stamp so the stamp reads on
   // busy artwork.
@@ -45,7 +46,7 @@ const META: Record<EventStatus, EventStatusMeta> = {
   postponed: {
     label: 'Postponed',
     shortNotice: 'Postponed — new date coming soon',
-    stampSrc: '/images/status/postponed.svg',
+    stampSrc: '/images/status/postponed.png',
     scrim: 'rgba(8, 12, 20, 0.45)',
     accent: '#0b6cb1',
     accentInk: '#ffffff',
@@ -53,7 +54,7 @@ const META: Record<EventStatus, EventStatusMeta> = {
   cancelled: {
     label: 'Cancelled',
     shortNotice: 'This event has been cancelled',
-    stampSrc: '/images/status/cancelled.svg',
+    stampSrc: '/images/status/cancelled.png',
     scrim: 'rgba(8, 12, 20, 0.55)',
     accent: '#e02a2a',
     accentInk: '#ffffff',
