@@ -12,6 +12,8 @@ import {
   IMAGE_FOCUS_COVER_TAG_PREFIX,
   IMAGE_FOCUS_SQUARE_TAG_PREFIX,
 } from "src/lib/imageCrop";
+import { normalizeEventStatus } from "src/lib/eventStatus";
+import { EventStatusBadge, EventStatusStamp } from "components/EventStatusStamp";
 
 interface Event {
   id: number;
@@ -23,6 +25,7 @@ interface Event {
   is_featured_grid?: boolean;
   featured_priority?: number | string | null;
   allowed_tags?: string[] | string | null;
+  status?: string | null;
 }
 
 interface DJSet {
@@ -280,6 +283,7 @@ export default function Page() {
                             <div className="relative w-full aspect-video overflow-hidden">
                               {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                               <img src={img} alt={displayTitle} style={cropRectImageStyle(coverCrop)} />
+                              <EventStatusStamp status={normalizeEventStatus(ev.status)} />
                             </div>
                             <div className="p-6 pb-7">
                               <div
@@ -334,6 +338,7 @@ export default function Page() {
                             <div className="relative w-full pt-[100%] overflow-hidden">
                               {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                               <img src={img} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
+                              <EventStatusStamp status={normalizeEventStatus(e.status)} />
                             </div>
                             <div className="p-4">
                               <h4
@@ -382,6 +387,7 @@ export default function Page() {
                             <div className="relative w-full h-[150px] rounded-md overflow-hidden hidden md:block">
                               {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                               <img src={img} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
+                              <EventStatusStamp status={normalizeEventStatus(e.status)} />
                             </div>
 
                             <div className="min-w-0 col-span-1 md:col-span-1">
@@ -389,6 +395,9 @@ export default function Page() {
                                 className="text-xl font-extrabold leading-tight mb-1"
                                 dangerouslySetInnerHTML={{ __html: formatEventText(displayTitle) }}
                               />
+                              {/* The thumbnail carrying the stamp is desktop-only, so the
+                                  badge is what tells the story at phone width. */}
+                              <EventStatusBadge status={normalizeEventStatus(e.status)} className="md:hidden mb-1" />
                               {e.location && (
                                 <div className="text-sm mt-1 text-[var(--dwd-ink-faint)]">
                                   {e.location}
@@ -450,6 +459,7 @@ export default function Page() {
                                     ? "TBA"
                                     : `${d.wk} ${d.mon} ${d.day}`}
                                 </div>
+                                <EventStatusBadge status={normalizeEventStatus(e.status)} />
                                 <div className="text-xs text-[var(--dwd-ink-faint)]">
                                   {e.location || "New date added"}
                                 </div>

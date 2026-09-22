@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 560" width="1000" height="560" role="img" aria-label="Postponed — new date coming soon">
+  <!-- Placeholder stamp art. Drop a replacement PNG/SVG in this folder and
+       point stampSrc in src/lib/eventStatus.ts at it to swap the artwork. -->
+  <g transform="rotate(-9 500 280)" fill="none" stroke="#0b6cb1">
+    <rect x="40" y="110" width="920" height="340" rx="30" stroke-width="18"/>
+    <rect x="72" y="142" width="856" height="276" rx="16" stroke-width="7"/>
+    <g fill="#0b6cb1" stroke="none" font-family="'Arial Black','Arial Bold',Impact,Helvetica,sans-serif" font-weight="900" text-anchor="middle">
+      <text x="500" y="302" font-size="150" textLength="780" lengthAdjust="spacingAndGlyphs">POSTPONED</text>
+      <text x="500" y="386" font-size="60" textLength="700" lengthAdjust="spacingAndGlyphs">NEW DATE COMING SOON</text>
+    </g>
+  </g>
+</svg>

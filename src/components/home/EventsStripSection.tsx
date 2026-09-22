@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { Container } from 'components/ui/Container';
 import { formatEventText } from 'src/utils/textFormatter';
 import { fillTokens, type EventsStripData, type ResidencyTokens } from 'src/lib/homeContent';
+import { normalizeEventStatus } from 'src/lib/eventStatus';
+import { EventStatusBadge } from 'components/EventStatusStamp';
 
 interface EventLite {
   id: number;
@@ -9,6 +11,7 @@ interface EventLite {
   date: string;
   location?: string;
   allowed_tags?: string[] | string | null;
+  status?: string | null;
 }
 
 const CARD_TILT_VARS = ['--dwd-tilt-1', '--dwd-tilt-2', '--dwd-tilt-3', '--dwd-tilt-4'];
@@ -76,8 +79,11 @@ export function EventsStripSection({
                 className="group bg-[var(--dwd-bg-card)] p-6 transition-transform duration-150 hover:!rotate-0 hover:-translate-y-1 [border:var(--dwd-card-border)] [border-radius:var(--dwd-card-radius)] [box-shadow:var(--dwd-card-shadow)]"
                 style={{ transform: `rotate(var(${CARD_TILT_VARS[i % CARD_TILT_VARS.length]}))` }}
               >
-                <div className="text-xs font-bold uppercase tracking-wider text-[var(--dwd-accent-1)] mb-2.5">
-                  {compactDate(event.date)}
+                <div className="flex flex-wrap items-center gap-2 mb-2.5">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[var(--dwd-accent-1)]">
+                    {compactDate(event.date)}
+                  </span>
+                  <EventStatusBadge status={normalizeEventStatus(event.status)} />
                 </div>
                 <div
                   className="text-[17px] font-bold mb-1.5 leading-snug"

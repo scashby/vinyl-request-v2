@@ -11,6 +11,8 @@ import { Container } from 'components/ui/Container';
 import EventDJSets from 'components/EventDJSets';
 import { useActiveTheme } from 'src/lib/useActiveTheme';
 import { cropRectImageStyle, getImageCropFromTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX } from 'src/lib/imageCrop';
+import { normalizeEventStatus } from 'src/lib/eventStatus';
+import { EventStatusNotice, EventStatusStamp } from 'components/EventStatusStamp';
 
 interface EventData {
   id: number;
@@ -23,6 +25,8 @@ interface EventData {
   info?: string;
   info_url?: string;
   allowed_tags?: string[] | string | null;
+  status?: string | null;
+  status_note?: string | null;
 }
 
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
@@ -146,8 +150,11 @@ export default function Page() {
     image_url_square,
     info,
     info_url,
-    allowed_tags
+    allowed_tags,
+    status_note,
   } = event;
+
+  const status = normalizeEventStatus(event.status);
 
   const displayTitle = getDisplayTitle({ ...event, allowed_tags });
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
@@ -198,6 +205,7 @@ export default function Page() {
             className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-4xl md:text-5xl"
             dangerouslySetInnerHTML={{ __html: formatEventText(displayTitle) }}
           />
+          <EventStatusNotice status={status} note={status_note} className="mt-5 max-w-2xl" />
         </div>
       </Container>
 
@@ -225,6 +233,7 @@ export default function Page() {
               <div className="relative aspect-square w-full overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                 <img src={imageSrc} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
+                <EventStatusStamp status={status} />
               </div>
               <div className="p-6">
                 <h2 className="text-2xl font-bold mb-2">{displayTitle}</h2>

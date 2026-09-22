@@ -3484,6 +3484,9 @@ export type Database = {
           location: string | null
           parent_event_id: number | null
           queue_types: string[] | null
+          status: string
+          status_changed_at: string | null
+          status_note: string | null
           time: string
           title: string
           venue_logo_url: string | null
@@ -3507,6 +3510,9 @@ export type Database = {
           location?: string | null
           parent_event_id?: number | null
           queue_types?: string[] | null
+          status?: string
+          status_changed_at?: string | null
+          status_note?: string | null
           time?: string
           title: string
           venue_logo_url?: string | null
@@ -3530,6 +3536,9 @@ export type Database = {
           location?: string | null
           parent_event_id?: number | null
           queue_types?: string[] | null
+          status?: string
+          status_changed_at?: string | null
+          status_note?: string | null
           time?: string
           title?: string
           venue_logo_url?: string | null

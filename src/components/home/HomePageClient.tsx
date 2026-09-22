@@ -26,6 +26,7 @@ interface Event {
   created_at?: string;
   location?: string;
   allowed_tags?: string[] | string | null;
+  status?: string | null;
 }
 
 interface BlogPost {

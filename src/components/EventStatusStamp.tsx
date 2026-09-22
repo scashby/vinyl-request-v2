@@ -1,0 +1,91 @@
+// src/components/EventStatusStamp.tsx
+// The public-facing marks for an event that has been postponed or cancelled:
+// a stamp laid over the event artwork, a text badge for the card layouts that
+// have no artwork, and a full-width notice for the event detail page.
+//
+// All three read from src/lib/eventStatus.ts, so the wording and colours of a
+// status are defined once.
+
+import {
+  getEventStatusMeta,
+  isEventCalledOff,
+  type EventStatus,
+} from 'src/lib/eventStatus';
+
+// Overlay for an image container. The container must already be
+// `position: relative; overflow: hidden` — every event image wrapper on the
+// site is, for its own rounded-corner/crop styling.
+export function EventStatusStamp({
+  status,
+  className = '',
+}: {
+  status: EventStatus;
+  className?: string;
+}) {
+  if (!isEventCalledOff(status)) return null;
+  const meta = getEventStatusMeta(status);
+
+  return (
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none absolute inset-0 flex items-center justify-center p-[6%] ${className}`}
+    >
+      <div className="absolute inset-0" style={{ background: meta.scrim }} />
+      {/* eslint-disable-next-line @next/next/no-img-element -- decorative stamp art sized as a percentage of its container; next/image adds nothing here */}
+      <img
+        src={meta.stampSrc}
+        alt=""
+        className="relative w-full max-w-full drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]"
+      />
+    </div>
+  );
+}
+
+// Text equivalent for the card layouts that show no artwork (home page strip,
+// "Just Announced" rail), where a stamp would have nothing to sit on.
+export function EventStatusBadge({
+  status,
+  className = '',
+}: {
+  status: EventStatus;
+  className?: string;
+}) {
+  if (!isEventCalledOff(status)) return null;
+  const meta = getEventStatusMeta(status);
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wider ${className}`}
+      style={{ background: meta.accent, color: meta.accentInk }}
+    >
+      {meta.label}
+    </span>
+  );
+}
+
+// Banner for the event detail page, carrying the optional admin note.
+export function EventStatusNotice({
+  status,
+  note,
+  className = '',
+}: {
+  status: EventStatus;
+  note?: string | null;
+  className?: string;
+}) {
+  if (!isEventCalledOff(status)) return null;
+  const meta = getEventStatusMeta(status);
+
+  return (
+    <div
+      className={`rounded-2xl px-5 py-4 ${className}`}
+      style={{ background: meta.accent, color: meta.accentInk }}
+      role="status"
+    >
+      <div className="text-lg font-black uppercase tracking-wide">{meta.label}</div>
+      <div className="mt-1 text-sm font-medium opacity-95">
+        {note?.trim() ? note : meta.shortNotice}
+      </div>
+    </div>
+  );
+}
