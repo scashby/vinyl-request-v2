@@ -12,6 +12,8 @@ import {
   IMAGE_FOCUS_COVER_TAG_PREFIX,
   IMAGE_FOCUS_SQUARE_TAG_PREFIX,
 } from "src/lib/imageCrop";
+import { formatStatusNewDate, normalizeEventStatus } from "src/lib/eventStatus";
+import { EventNewDateChip, EventStatusBadge, EventStatusStamp } from "components/EventStatusStamp";
 
 interface Event {
   id: number;
@@ -23,6 +25,8 @@ interface Event {
   is_featured_grid?: boolean;
   featured_priority?: number | string | null;
   allowed_tags?: string[] | string | null;
+  status?: string | null;
+  status_new_date?: string | null;
 }
 
 interface DJSet {
@@ -280,17 +284,28 @@ export default function Page() {
                             <div className="relative w-full aspect-video overflow-hidden">
                               {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                               <img src={img} alt={displayTitle} style={cropRectImageStyle(coverCrop)} />
+                              <EventStatusStamp status={normalizeEventStatus(ev.status)} />
                             </div>
                             <div className="p-6 pb-7">
-                              <div
-                                className="inline-block px-4 py-2.5 rounded-lg font-black mb-4"
-                                style={
-                                  tba
-                                    ? { background: 'var(--dwd-ink-faint)', color: 'var(--dwd-bg)' }
-                                    : { background: 'var(--dwd-accent-1)', color: 'var(--dwd-bg)' }
-                                }
-                              >
-                                {tba ? "TBA" : `${d.wk} ${d.mon} ${d.day}`}
+                              <div className="flex flex-wrap items-center gap-2 mb-4">
+                                <div
+                                  className="inline-block px-4 py-2.5 rounded-lg font-black"
+                                  style={{
+                                    ...(tba
+                                      ? { background: 'var(--dwd-ink-faint)', color: 'var(--dwd-bg)' }
+                                      : { background: 'var(--dwd-accent-1)', color: 'var(--dwd-bg)' }),
+                                    ...(formatStatusNewDate(ev.status_new_date)
+                                      && normalizeEventStatus(ev.status) === 'postponed'
+                                      ? { textDecoration: 'line-through', opacity: 0.7 }
+                                      : {}),
+                                  }}
+                                >
+                                  {tba ? "TBA" : `${d.wk} ${d.mon} ${d.day}`}
+                                </div>
+                                <EventNewDateChip
+                                  status={normalizeEventStatus(ev.status)}
+                                  newDate={ev.status_new_date}
+                                />
                               </div>
                               <h3
                                 className="text-3xl font-black leading-tight m-0"
@@ -334,6 +349,7 @@ export default function Page() {
                             <div className="relative w-full pt-[100%] overflow-hidden">
                               {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                               <img src={img} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
+                              <EventStatusStamp status={normalizeEventStatus(e.status)} />
                             </div>
                             <div className="p-4">
                               <h4
@@ -341,7 +357,22 @@ export default function Page() {
                                 dangerouslySetInnerHTML={{ __html: formatEventText(displayTitle) }}
                               />
                               <div className="font-extrabold text-sm text-[var(--dwd-accent-1)]">
-                                {tba ? "TBA" : `${d.mon} ${d.day}`}
+                                <span
+                                  style={
+                                    normalizeEventStatus(e.status) === 'postponed'
+                                      && formatStatusNewDate(e.status_new_date)
+                                      ? { textDecoration: 'line-through', opacity: 0.7 }
+                                      : undefined
+                                  }
+                                >
+                                  {tba ? "TBA" : `${d.mon} ${d.day}`}
+                                </span>
+                                {normalizeEventStatus(e.status) === 'postponed'
+                                  && formatStatusNewDate(e.status_new_date) && (
+                                  <span className="block mt-1">
+                                    New: {formatStatusNewDate(e.status_new_date)}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -382,6 +413,7 @@ export default function Page() {
                             <div className="relative w-full h-[150px] rounded-md overflow-hidden hidden md:block">
                               {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                               <img src={img} alt={displayTitle} style={cropRectImageStyle(squareCrop)} />
+                              <EventStatusStamp status={normalizeEventStatus(e.status)} />
                             </div>
 
                             <div className="min-w-0 col-span-1 md:col-span-1">
@@ -389,6 +421,15 @@ export default function Page() {
                                 className="text-xl font-extrabold leading-tight mb-1"
                                 dangerouslySetInnerHTML={{ __html: formatEventText(displayTitle) }}
                               />
+                              {/* The thumbnail carrying the stamp is desktop-only, so the
+                                  badge is what tells the story at phone width. */}
+                              <div className="flex flex-wrap items-center gap-2 mb-1">
+                                <EventStatusBadge status={normalizeEventStatus(e.status)} className="md:hidden" />
+                                <EventNewDateChip
+                                  status={normalizeEventStatus(e.status)}
+                                  newDate={e.status_new_date}
+                                />
+                              </div>
                               {e.location && (
                                 <div className="text-sm mt-1 text-[var(--dwd-ink-faint)]">
                                   {e.location}
@@ -450,8 +491,12 @@ export default function Page() {
                                     ? "TBA"
                                     : `${d.wk} ${d.mon} ${d.day}`}
                                 </div>
+                                <EventStatusBadge status={normalizeEventStatus(e.status)} />
                                 <div className="text-xs text-[var(--dwd-ink-faint)]">
-                                  {e.location || "New date added"}
+                                  {normalizeEventStatus(e.status) === 'postponed'
+                                    && formatStatusNewDate(e.status_new_date)
+                                    ? `New date: ${formatStatusNewDate(e.status_new_date)}`
+                                    : e.location || "New date added"}
                                 </div>
                               </div>
                             </div>

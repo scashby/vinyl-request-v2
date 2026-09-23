@@ -7,6 +7,8 @@ import { supabase } from 'lib/supabaseClient'
 import { Container } from 'components/ui/Container';
 import { Button } from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
+import EventStatusModal, { type StatusTargetEvent } from 'components/admin/EventStatusModal';
+import { getEventStatusMeta, isEventCalledOff, normalizeEventStatus } from 'src/lib/eventStatus';
 
 // Define the Event interface to satisfy linting
 interface Event {
@@ -17,6 +19,9 @@ interface Event {
   parent_event_id?: number | null;
   is_featured_grid?: boolean;
   featured_priority?: number | null;
+  status?: string | null;
+  status_note?: string | null;
+  status_new_date?: string | null;
   allowed_tags?: string[] | string | null;
   [key: string]: unknown; // Allow for other dynamic fields
 }
@@ -52,6 +57,7 @@ const getTagValue = (tags: string[], prefix: string): string => {
 export default function Page() {
   const [events, setEvents] = useState<Event[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusTarget, setStatusTarget] = useState<StatusTargetEvent | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -135,6 +141,12 @@ export default function Page() {
         is_recurring: false,
         recurrence_end_date: '',
         parent_event_id: undefined,
+        // A copy is a brand new event — it should never inherit a
+        // postponed/cancelled stamp from the event it was copied from.
+        status: 'scheduled',
+        status_note: null,
+        status_new_date: null,
+        status_changed_at: null,
         title: `${event.title} (Copy)`
       };
       sessionStorage.setItem('copiedEvent', JSON.stringify(eventCopy));
@@ -210,6 +222,8 @@ export default function Page() {
           const tags = normalizeStringArray(event.allowed_tags);
           const eventType = getTagValue(tags, EVENT_TYPE_TAG_PREFIX);
           const eventSubtype = getTagValue(tags, EVENT_SUBTYPE_TAG_PREFIX);
+          const status = normalizeEventStatus(event.status);
+          const statusMeta = getEventStatusMeta(status);
 
           return (
             <Card key={event.id} className="flex flex-col gap-4">
@@ -219,6 +233,14 @@ export default function Page() {
                     {event.title} <span className="text-gray-500 font-normal">– {event.date}</span>
                   </span>
                   <div className="flex flex-wrap gap-2 mt-2">
+                    {isEventCalledOff(status) && (
+                      <span
+                        className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-wider px-2 py-1 rounded-full"
+                        style={{ background: statusMeta.accent, color: statusMeta.accentInk }}
+                      >
+                        {statusMeta.label}
+                      </span>
+                    )}
                     {event.is_recurring && (
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-100 px-2 py-1 rounded-full">
                         Recurring
@@ -250,6 +272,24 @@ export default function Page() {
                     onClick={() => handleCopy(event)}
                   >
                     Copy
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() =>
+                      setStatusTarget({
+                        id: event.id,
+                        title: event.title,
+                        date: event.date,
+                        status: event.status ?? null,
+                        status_note: event.status_note ?? null,
+                        status_new_date: event.status_new_date ?? null,
+                        is_recurring: event.is_recurring,
+                        parent_event_id: event.parent_event_id ?? null,
+                      })
+                    }
+                  >
+                    Postpone / Cancel
                   </Button>
                   <Button 
                     size="sm"
@@ -285,6 +325,14 @@ export default function Page() {
           );
         })}
       </div>
+
+      {statusTarget && (
+        <EventStatusModal
+          event={statusTarget}
+          onClose={() => setStatusTarget(null)}
+          onSaved={refreshEvents}
+        />
+      )}
     </Container>
   );
 }
