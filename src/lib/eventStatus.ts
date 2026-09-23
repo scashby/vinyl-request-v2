@@ -25,9 +25,14 @@ type EventStatusMeta = {
   // point this at it. Whatever it points at must have a transparent
   // background: the stamp sits directly on the event photo.
   stampSrc: string;
-  // Scrim painted between the photo and the stamp so the stamp reads on
-  // busy artwork.
+  // Wash painted between the photo and the stamp. It lightens the artwork
+  // rather than darkening it, so the stamp's own colour is what carries the
+  // contrast. Kept light enough that the photo is still legible underneath —
+  // a flat white veil strong enough to work on dark art erases light art.
   scrim: string;
+  // Paired with the wash: desaturates and brightens whatever is behind it, so
+  // busy or dark artwork fades back without the veil having to do it alone.
+  scrimFilter: string;
   // Hex accents for badges/banners, kept out of Tailwind classes so the same
   // values drive both the light admin UI and the themed public pages.
   accent: string;
@@ -40,6 +45,7 @@ const META: Record<EventStatus, EventStatusMeta> = {
     shortNotice: '',
     stampSrc: '',
     scrim: 'transparent',
+    scrimFilter: 'none',
     accent: '#16a34a',
     accentInk: '#ffffff',
   },
@@ -47,7 +53,8 @@ const META: Record<EventStatus, EventStatusMeta> = {
     label: 'Postponed',
     shortNotice: 'Postponed — new date coming soon',
     stampSrc: '/images/status/postponed.png',
-    scrim: 'rgba(8, 12, 20, 0.45)',
+    scrim: 'rgba(255, 255, 255, 0.34)',
+    scrimFilter: 'saturate(0.45) brightness(1.14)',
     accent: '#0b6cb1',
     accentInk: '#ffffff',
   },
@@ -55,7 +62,8 @@ const META: Record<EventStatus, EventStatusMeta> = {
     label: 'Cancelled',
     shortNotice: 'This event has been cancelled',
     stampSrc: '/images/status/cancelled.png',
-    scrim: 'rgba(8, 12, 20, 0.55)',
+    scrim: 'rgba(255, 255, 255, 0.38)',
+    scrimFilter: 'saturate(0.4) brightness(1.16)',
     accent: '#e02a2a',
     accentInk: '#ffffff',
   },

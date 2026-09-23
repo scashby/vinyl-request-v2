@@ -31,12 +31,21 @@ export function EventStatusStamp({
       aria-hidden="true"
       className={`pointer-events-none absolute inset-0 flex items-center justify-center p-[6%] ${className}`}
     >
-      <div className="absolute inset-0" style={{ background: meta.scrim }} />
+      <div
+        className="absolute inset-0"
+        style={{
+          background: meta.scrim,
+          backdropFilter: meta.scrimFilter,
+          WebkitBackdropFilter: meta.scrimFilter,
+        }}
+      />
       {/* eslint-disable-next-line @next/next/no-img-element -- decorative stamp art sized as a percentage of its container; next/image adds nothing here */}
       <img
         src={meta.stampSrc}
         alt=""
-        className="relative w-full max-w-full drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]"
+        // A white halo, not a drop shadow: the stamp sits on a lightened
+        // photo, where a dark shadow just muddies the edges again.
+        className="relative w-full max-w-full [filter:drop-shadow(0_0_3px_rgba(255,255,255,0.95))_drop-shadow(0_1px_6px_rgba(255,255,255,0.8))]"
       />
     </div>
   );
