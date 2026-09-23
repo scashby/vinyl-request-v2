@@ -26,6 +26,7 @@ export type StatusTargetEvent = {
   date: string;
   status?: string | null;
   status_note?: string | null;
+  status_new_date?: string | null;
   is_recurring?: boolean;
   parent_event_id?: number | null;
 };
@@ -56,6 +57,7 @@ export default function EventStatusModal({
 }) {
   const [status, setStatus] = useState<EventStatus>(normalizeEventStatus(event.status));
   const [note, setNote] = useState(event.status_note ?? '');
+  const [newDate, setNewDate] = useState(event.status_new_date ?? '');
   const [scope, setScope] = useState<Scope>('single');
   const [seriesEvents, setSeriesEvents] = useState<SeriesEvent[]>([]);
   const [loadingSeries, setLoadingSeries] = useState(false);
@@ -116,6 +118,8 @@ export default function EventStatusModal({
           // A note only describes a call-off, so returning an event to the
           // schedule clears it rather than leaving stale copy behind.
           status_note: status === 'scheduled' ? null : trimmedNote || null,
+          // Only a postponement can carry a replacement date.
+          status_new_date: status === 'postponed' ? newDate || null : null,
           status_changed_at: new Date().toISOString(),
         })
         .in('id', affected);
@@ -170,6 +174,25 @@ export default function EventStatusModal({
             );
           })}
         </div>
+
+        {status === 'postponed' && (
+          <div className="mt-5">
+            <label className="block text-sm font-semibold text-gray-700" htmlFor="status-new-date">
+              New date <span className="font-normal text-gray-400">(if known)</span>
+            </label>
+            <input
+              id="status-new-date"
+              type="date"
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Leave empty while it&apos;s unknown. To move the event onto the new date
+              and clear the stamp, use Edit instead.
+            </p>
+          </div>
+        )}
 
         {status !== 'scheduled' && (
           <div className="mt-5">

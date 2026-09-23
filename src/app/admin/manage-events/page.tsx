@@ -21,6 +21,7 @@ interface Event {
   featured_priority?: number | null;
   status?: string | null;
   status_note?: string | null;
+  status_new_date?: string | null;
   allowed_tags?: string[] | string | null;
   [key: string]: unknown; // Allow for other dynamic fields
 }
@@ -144,6 +145,7 @@ export default function Page() {
         // postponed/cancelled stamp from the event it was copied from.
         status: 'scheduled',
         status_note: null,
+        status_new_date: null,
         status_changed_at: null,
         title: `${event.title} (Copy)`
       };
@@ -281,6 +283,7 @@ export default function Page() {
                         date: event.date,
                         status: event.status ?? null,
                         status_note: event.status_note ?? null,
+                        status_new_date: event.status_new_date ?? null,
                         is_recurring: event.is_recurring,
                         parent_event_id: event.parent_event_id ?? null,
                       })

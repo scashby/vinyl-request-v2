@@ -11,7 +11,7 @@ import { Container } from 'components/ui/Container';
 import EventDJSets from 'components/EventDJSets';
 import { useActiveTheme } from 'src/lib/useActiveTheme';
 import { cropRectImageStyle, getImageCropFromTags, IMAGE_FOCUS_SQUARE_TAG_PREFIX } from 'src/lib/imageCrop';
-import { normalizeEventStatus } from 'src/lib/eventStatus';
+import { formatStatusNewDate, normalizeEventStatus } from 'src/lib/eventStatus';
 import { EventStatusNotice, EventStatusStamp } from 'components/EventStatusStamp';
 
 interface EventData {
@@ -27,6 +27,7 @@ interface EventData {
   allowed_tags?: string[] | string | null;
   status?: string | null;
   status_note?: string | null;
+  status_new_date?: string | null;
 }
 
 const EVENT_TYPE_TAG_PREFIX = 'event_type:';
@@ -152,6 +153,7 @@ export default function Page() {
     info_url,
     allowed_tags,
     status_note,
+    status_new_date,
   } = event;
 
   const status = normalizeEventStatus(event.status);
@@ -205,7 +207,12 @@ export default function Page() {
             className="font-[family-name:var(--dwd-font-display)] [text-transform:var(--dwd-headline-transform)] text-4xl md:text-5xl"
             dangerouslySetInnerHTML={{ __html: formatEventText(displayTitle) }}
           />
-          <EventStatusNotice status={status} note={status_note} className="mt-5 max-w-2xl" />
+          <EventStatusNotice
+            status={status}
+            note={status_note}
+            newDate={status_new_date}
+            className="mt-5 max-w-2xl"
+          />
         </div>
       </Container>
 
@@ -262,7 +269,20 @@ export default function Page() {
                   </div>
                 )}
                 <div className="text-[var(--dwd-ink-soft)] font-medium border-t border-[var(--dwd-ink)]/10 pt-4 mt-2">
-                  {formatDate(date)}
+                  <span
+                    style={
+                      status === 'postponed' && formatStatusNewDate(status_new_date)
+                        ? { textDecoration: 'line-through', opacity: 0.7 }
+                        : undefined
+                    }
+                  >
+                    {formatDate(date)}
+                  </span>
+                  {status === 'postponed' && formatStatusNewDate(status_new_date, 'long') && (
+                    <span className="block font-black text-[var(--dwd-ink)]">
+                      New date: {formatStatusNewDate(status_new_date, 'long')}
+                    </span>
+                  )}
                   <br />
                   {time && <span className="text-[var(--dwd-ink-faint)] text-sm">{time}</span>}
                 </div>

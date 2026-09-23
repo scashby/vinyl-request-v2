@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { Container } from 'components/ui/Container';
 import { formatEventText } from 'src/utils/textFormatter';
 import { fillTokens, type EventsStripData, type ResidencyTokens } from 'src/lib/homeContent';
-import { normalizeEventStatus } from 'src/lib/eventStatus';
-import { EventStatusBadge } from 'components/EventStatusStamp';
+import { formatStatusNewDate, normalizeEventStatus } from 'src/lib/eventStatus';
+import { EventNewDateChip, EventStatusBadge } from 'components/EventStatusStamp';
 
 interface EventLite {
   id: number;
@@ -12,6 +12,7 @@ interface EventLite {
   location?: string;
   allowed_tags?: string[] | string | null;
   status?: string | null;
+  status_new_date?: string | null;
 }
 
 const CARD_TILT_VARS = ['--dwd-tilt-1', '--dwd-tilt-2', '--dwd-tilt-3', '--dwd-tilt-4'];
@@ -80,10 +81,22 @@ export function EventsStripSection({
                 style={{ transform: `rotate(var(${CARD_TILT_VARS[i % CARD_TILT_VARS.length]}))` }}
               >
                 <div className="flex flex-wrap items-center gap-2 mb-2.5">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[var(--dwd-accent-1)]">
+                  <span
+                    className="text-xs font-bold uppercase tracking-wider text-[var(--dwd-accent-1)]"
+                    style={
+                      normalizeEventStatus(event.status) === 'postponed'
+                        && formatStatusNewDate(event.status_new_date)
+                        ? { textDecoration: 'line-through', opacity: 0.7 }
+                        : undefined
+                    }
+                  >
                     {compactDate(event.date)}
                   </span>
                   <EventStatusBadge status={normalizeEventStatus(event.status)} />
+                  <EventNewDateChip
+                    status={normalizeEventStatus(event.status)}
+                    newDate={event.status_new_date}
+                  />
                 </div>
                 <div
                   className="text-[17px] font-bold mb-1.5 leading-snug"

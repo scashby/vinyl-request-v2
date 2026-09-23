@@ -19,6 +19,7 @@ import {
 import {
   EVENT_STATUSES,
   eventStatusLabel,
+  formatStatusNewDate,
   getEventStatusMeta,
   normalizeEventStatus,
   type EventStatus,
@@ -110,6 +111,8 @@ interface EventData {
   // the stamp the public pages lay over the image.
   status: EventStatus;
   status_note: string;
+  // The announced replacement date, only meaningful while postponed.
+  status_new_date: string;
 
   is_recurring: boolean;
   recurrence_pattern: string;
@@ -238,6 +241,7 @@ function buildEventDataFromDbEvent(dbEvent: DbEvent): EventData {
     info_url: dbEvent.info_url ?? '',
     status: normalizeEventStatus(dbEvent.status),
     status_note: dbEvent.status_note ?? '',
+    status_new_date: dbEvent.status_new_date ?? '',
     is_recurring: !!dbEvent.is_recurring,
     recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
     recurrence_interval: dbEvent.recurrence_interval || 1,
@@ -266,6 +270,7 @@ const OVERRIDE_FIELDS: Array<{
   { key: 'featured_priority', label: 'Featured Priority' },
   { key: 'status', label: 'Status' },
   { key: 'status_note', label: 'Status note' },
+  { key: 'status_new_date', label: 'New date' },
 ];
 
 function formatDiffValue(value: unknown): string {
@@ -296,9 +301,15 @@ export default function EditEventForm({
   // What the loaded event's status/note were, so a save that doesn't touch the
   // status leaves status_changed_at alone, and so the date field can point out
   // that a rescheduled event is still flagged postponed.
-  const loadedStatusRef = useRef<{ status: EventStatus; note: string; date: string }>({
+  const loadedStatusRef = useRef<{
+    status: EventStatus;
+    note: string;
+    newDate: string;
+    date: string;
+  }>({
     status: 'scheduled',
     note: '',
+    newDate: '',
     date: '',
   });
   const [isPartOfSeries, setIsPartOfSeries] = useState(false);
@@ -341,6 +352,7 @@ export default function EditEventForm({
     info_url: '',
     status: 'scheduled',
     status_note: '',
+    status_new_date: '',
     is_recurring: false,
     recurrence_pattern: 'weekly',
     recurrence_interval: 1,
@@ -549,6 +561,7 @@ export default function EditEventForm({
           // stamp from the event it was copied from.
           status: 'scheduled',
           status_note: '',
+          status_new_date: '',
           is_recurring: false
         }));
         setImageCropCover(parseImageCropTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
@@ -582,6 +595,7 @@ export default function EditEventForm({
             info_url: dbEvent.info_url ?? '',
             status: normalizeEventStatus(dbEvent.status),
             status_note: dbEvent.status_note ?? '',
+            status_new_date: dbEvent.status_new_date ?? '',
 
             is_recurring: dbEvent.is_recurring || false,
             recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
@@ -595,6 +609,7 @@ export default function EditEventForm({
           loadedStatusRef.current = {
             status: normalizeEventStatus(dbEvent.status),
             note: dbEvent.status_note ?? '',
+            newDate: dbEvent.status_new_date ?? '',
             date: dbEvent.date ?? '',
           };
           setImageCropCover(parseImageCropTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
@@ -702,6 +717,7 @@ export default function EditEventForm({
         info_url: dbEvent.info_url ?? '',
         status: normalizeEventStatus(dbEvent.status),
         status_note: dbEvent.status_note ?? '',
+        status_new_date: dbEvent.status_new_date ?? '',
         is_recurring: dbEvent.is_recurring || false,
         recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
         recurrence_interval: dbEvent.recurrence_interval || 1,
@@ -714,6 +730,7 @@ export default function EditEventForm({
       loadedStatusRef.current = {
         status: normalizeEventStatus(dbEvent.status),
         note: dbEvent.status_note ?? '',
+        newDate: dbEvent.status_new_date ?? '',
         date: dbEvent.date ?? '',
       };
       setImageCropCover(parseImageCropTag(normalizedTags, IMAGE_FOCUS_COVER_TAG_PREFIX));
@@ -906,9 +923,11 @@ export default function EditEventForm({
       // status_changed_at is only written when the status actually moved, so an
       // unrelated edit to a cancelled event doesn't restamp the time.
       const statusNote = eventData.status_note.trim();
+      const statusNewDate = eventData.status === 'postponed' ? eventData.status_new_date : '';
       const statusChanged =
         eventData.status !== loadedStatusRef.current.status
-        || statusNote !== loadedStatusRef.current.note.trim();
+        || statusNote !== loadedStatusRef.current.note.trim()
+        || statusNewDate !== loadedStatusRef.current.newDate;
 
       const payload: EventInsert = {
         allowed_tags: allowedTags.length > 0 ? allowedTags : null,
@@ -925,6 +944,9 @@ export default function EditEventForm({
         // A note only describes a call-off, so putting an event back on the
         // schedule clears it rather than leaving stale copy behind.
         status_note: eventData.status === 'scheduled' ? null : statusNote || null,
+        // Only a postponement can carry a replacement date; anything else
+        // clears it so a rescheduled or cancelled event can't keep announcing one.
+        status_new_date: statusNewDate || null,
         ...(statusChanged ? { status_changed_at: new Date().toISOString() } : {}),
 
         is_recurring: isTBA ? false : eventData.is_recurring,
@@ -1644,6 +1666,27 @@ export default function EditEventForm({
                 })}
               </div>
 
+              {eventData.status === 'postponed' && (
+                <div className="mt-4">
+                  <label className="text-xs font-semibold text-gray-500" htmlFor="status_new_date">
+                    New date <span className="font-normal text-gray-400">(if known)</span>
+                  </label>
+                  <input
+                    id="status_new_date"
+                    type="date"
+                    name="status_new_date"
+                    value={eventData.status_new_date}
+                    onChange={handleChange}
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Leave empty while the new date is unknown — the stamp just reads
+                    “new date coming soon”. Fill it in and the site shows the original
+                    date struck through next to the new one.
+                  </p>
+                </div>
+              )}
+
               {eventData.status !== 'scheduled' && (
                 <div className="mt-4">
                   <label className="text-xs font-semibold text-gray-500" htmlFor="status_note">
@@ -1658,6 +1701,38 @@ export default function EditEventForm({
                     placeholder={getEventStatusMeta(eventData.status).shortNotice}
                     className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
                   />
+                </div>
+              )}
+
+              {/* The end of a postponement: move the event onto the announced date
+                  and clear the stamp. This only fills the form in — the usual Save
+                  button still applies it, on whichever series scope is selected. */}
+              {eventData.status === 'postponed' && eventData.status_new_date && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEventData((prev) => ({
+                      ...prev,
+                      date: prev.status_new_date,
+                      status: 'scheduled',
+                      status_note: '',
+                      status_new_date: '',
+                    }))
+                  }
+                  className="mt-4 w-full rounded-lg bg-gray-900 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-700"
+                >
+                  Move event to {formatStatusNewDate(eventData.status_new_date, 'medium')}{' '}
+                  &amp; mark Scheduled
+                </button>
+              )}
+
+              {/* After the move button runs, the form holds the new date but nothing
+                  is saved yet — say so rather than letting it look already applied. */}
+              {eventData.status === 'scheduled'
+                && loadedStatusRef.current.status === 'postponed'
+                && eventData.date !== loadedStatusRef.current.date && (
+                <div className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
+                  Moved to {formatStatusNewDate(eventData.date, 'medium')}. Save to apply it.
                 </div>
               )}
 

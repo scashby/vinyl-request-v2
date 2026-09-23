@@ -7,6 +7,7 @@
 // status are defined once.
 
 import {
+  formatStatusNewDate,
   getEventStatusMeta,
   isEventCalledOff,
   type EventStatus,
@@ -63,18 +64,48 @@ export function EventStatusBadge({
   );
 }
 
+// The announced replacement date, for the card layouts that show a date.
+// Renders nothing until a new date has actually been set, which is the
+// difference between "postponed, date unknown" and "postponed, moved to X".
+export function EventNewDateChip({
+  status,
+  newDate,
+  className = '',
+}: {
+  status: EventStatus;
+  newDate?: string | null;
+  className?: string;
+}) {
+  if (status !== 'postponed') return null;
+  const label = formatStatusNewDate(newDate, 'compact');
+  if (!label) return null;
+  const meta = getEventStatusMeta('postponed');
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wider ${className}`}
+      style={{ background: meta.accent, color: meta.accentInk }}
+    >
+      New date: {label}
+    </span>
+  );
+}
+
 // Banner for the event detail page, carrying the optional admin note.
 export function EventStatusNotice({
   status,
   note,
+  newDate,
   className = '',
 }: {
   status: EventStatus;
   note?: string | null;
+  newDate?: string | null;
   className?: string;
 }) {
   if (!isEventCalledOff(status)) return null;
   const meta = getEventStatusMeta(status);
+  const newDateLabel = status === 'postponed' ? formatStatusNewDate(newDate, 'long') : '';
 
   return (
     <div
@@ -83,8 +114,11 @@ export function EventStatusNotice({
       role="status"
     >
       <div className="text-lg font-black uppercase tracking-wide">{meta.label}</div>
+      {newDateLabel && (
+        <div className="mt-1 text-base font-black">New date: {newDateLabel}</div>
+      )}
       <div className="mt-1 text-sm font-medium opacity-95">
-        {note?.trim() ? note : meta.shortNotice}
+        {note?.trim() ? note : newDateLabel ? '' : meta.shortNotice}
       </div>
     </div>
   );

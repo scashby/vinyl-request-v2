@@ -3486,6 +3486,7 @@ export type Database = {
           queue_types: string[] | null
           status: string
           status_changed_at: string | null
+          status_new_date: string | null
           status_note: string | null
           time: string
           title: string
@@ -3512,6 +3513,7 @@ export type Database = {
           queue_types?: string[] | null
           status?: string
           status_changed_at?: string | null
+          status_new_date?: string | null
           status_note?: string | null
           time?: string
           title: string
@@ -3538,6 +3540,7 @@ export type Database = {
           queue_types?: string[] | null
           status?: string
           status_changed_at?: string | null
+          status_new_date?: string | null
           status_note?: string | null
           time?: string
           title?: string

@@ -27,6 +27,7 @@ interface Event {
   location?: string;
   allowed_tags?: string[] | string | null;
   status?: string | null;
+  status_new_date?: string | null;
 }
 
 interface BlogPost {

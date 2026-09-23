@@ -78,6 +78,35 @@ export function isEventCalledOff(status: EventStatus): boolean {
   return status !== 'scheduled';
 }
 
+// A stored 'YYYY-MM-DD' rendered for display. Parsed as local midnight, the
+// way every other date on the site is, so it can't slip a day in a western
+// timezone. The TBA sentinel and anything unparseable render as nothing —
+// callers treat an empty string as "no new date announced".
+export function formatStatusNewDate(
+  value: string | null | undefined,
+  style: 'compact' | 'medium' | 'long' = 'compact'
+): string {
+  if (!value || value === '9999-12-31') return '';
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return '';
+  if (style === 'long') {
+    return parsed.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  }
+  const short = parsed.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  // 'compact' feeds chips and date badges, which are uppercase everywhere on
+  // the site; 'medium' reads inside a sentence, where shouting looks wrong.
+  return style === 'medium' ? short : short.toUpperCase();
+}
+
 export function eventStatusLabel(status: EventStatus): string {
   return META[status].label;
 }
