@@ -42,6 +42,13 @@ type Props = {
 // photo that fall outside it stay visible instead of being cut away.
 const DISPLAY_AREA_INSET = "14%";
 
+// The stage is as tall as its target aspect makes it, so a 1:1 crop at the
+// modal's full width came out as tall as the modal is wide — taller than a
+// laptop window, which pushed Cancel/Save off the bottom of the screen with
+// nothing to scroll. Cap the stage in viewport height and let its width
+// follow, so the whole modal fits without the aspect ratio being squashed.
+const STAGE_MAX_VH = 52;
+
 export default function EventImageCropModal({
   imageUrl,
   initialCrop,
@@ -161,11 +168,11 @@ export default function EventImageCropModal({
   const sliderValue = Math.log(focus.zoom) / Math.log(factor);
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gray-900/60" onClick={onClose} />
 
-      <div className="relative z-10 flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4">
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
           <button
             type="button"
@@ -179,16 +186,16 @@ export default function EventImageCropModal({
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
           {/* Equal insets on every side keep the display area the same
               shape as the stage, so the stage carries the target aspect. */}
           <div
             ref={stageRef}
             onPointerDown={handlePointerDown}
-            className={`relative w-full overflow-hidden rounded-lg bg-gray-100 select-none touch-none ${
+            className={`relative mx-auto overflow-hidden rounded-lg bg-gray-100 select-none touch-none ${
               isDragging ? "cursor-grabbing" : "cursor-grab"
             }`}
-            style={{ aspectRatio: String(aspect) }}
+            style={{ aspectRatio: String(aspect), width: `min(100%, ${(STAGE_MAX_VH * aspect).toFixed(2)}vh)` }}
           >
             <div ref={displayAreaRef} className="absolute" style={{ inset: DISPLAY_AREA_INSET }}>
               {/* eslint-disable-next-line @next/next/no-img-element -- explicit pixel geometry, which next/image's own sizing would override */}
@@ -252,7 +259,7 @@ export default function EventImageCropModal({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-gray-200 px-6 py-4">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-gray-200 px-6 py-4">
           <button
             type="button"
             onClick={onClose}
