@@ -150,20 +150,47 @@ type EditEventFormProps = {
   onCancel?: () => void;
 };
 
+// An event date is a calendar date ("2027-03-21"), not a moment in time, so
+// every step here works in UTC and never touches the local-time getters.
+//
+// This used to mix the two and silently lost a day. `new Date("2027-03-07")`
+// parses as UTC midnight, which in New York is 19:00 on the 6th; stepping
+// with the LOCAL setDate/getDate held that 19:00 while toISOString() read the
+// date back in UTC, five hours ahead, so the +5 rollover happened to land on
+// the right day. When daylight saving started the offset became four hours,
+// 19:00 local was 23:00 UTC on the SAME day, the rollover stopped, and every
+// date from then on slipped back one day — a Sunday series began generating
+// Saturdays from 2027-03-20 onward. Doing it all in UTC removes the mismatch
+// rather than compensating for it.
+function parseCalendarDate(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec((value || '').slice(0, 10));
+  if (!match) return null;
+  const [, year, month, day] = match;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatCalendarDate(date: Date): string {
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${date.getUTCFullYear()}-${month}-${day}`;
+}
+
 // Utility function to generate recurring events
 function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<EventData, 'id'>[] {
   const events: Omit<EventData, 'id'>[] = [];
-  
+
   const isTBA = !baseEvent.date || baseEvent.date === '' || baseEvent.date === '9999-12-31';
-  
-  if (!baseEvent.is_recurring || !baseEvent.recurrence_end_date || isTBA) {
+
+  const startDate = parseCalendarDate(baseEvent.date);
+  const endDate = parseCalendarDate(baseEvent.recurrence_end_date);
+
+  if (!baseEvent.is_recurring || !baseEvent.recurrence_end_date || isTBA || !startDate || !endDate) {
     const eventWithoutId = { ...baseEvent };
     delete eventWithoutId.id;
     return [eventWithoutId];
   }
 
-  const startDate = new Date(baseEvent.date);
-  const endDate = new Date(baseEvent.recurrence_end_date);
   const pattern = baseEvent.recurrence_pattern;
   const interval = baseEvent.recurrence_interval || 1;
 
@@ -174,20 +201,20 @@ function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<E
     delete baseEventWithoutId.id;
     const eventForDate: Omit<EventData, 'id'> = {
       ...baseEventWithoutId,
-      date: currentDate.toISOString().split('T')[0],
+      date: formatCalendarDate(currentDate),
       parent_event_id: baseEvent.id
     };
     events.push(eventForDate);
 
     switch (pattern) {
       case 'daily':
-        currentDate.setDate(currentDate.getDate() + interval);
+        currentDate.setUTCDate(currentDate.getUTCDate() + interval);
         break;
       case 'weekly':
-        currentDate.setDate(currentDate.getDate() + (7 * interval));
+        currentDate.setUTCDate(currentDate.getUTCDate() + (7 * interval));
         break;
       case 'monthly':
-        currentDate.setMonth(currentDate.getMonth() + interval);
+        currentDate.setUTCMonth(currentDate.getUTCMonth() + interval);
         break;
       default:
         return events;
