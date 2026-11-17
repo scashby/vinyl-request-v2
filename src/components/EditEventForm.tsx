@@ -1575,7 +1575,7 @@ export default function EditEventForm({
                           <p className="text-xs font-semibold text-gray-700">Cover / widescreen (16:9)</p>
                           <p className="text-[11px] text-gray-500">Used on: the Up Next card on the events page</p>
                         </div>
-                        <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-gray-900">
+                        <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-gray-100">
                           {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                           <img
                             src={eventData.image_url}
@@ -1603,7 +1603,7 @@ export default function EditEventForm({
                             Used on: the Featured grid, event list thumbnails, and the event detail page
                           </p>
                         </div>
-                        <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-900">
+                        <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-100">
                           {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary crop rectangle needs raw left/top/width/height, which next/image's fill+object-fit can't express */}
                           <img
                             src={eventData.image_url_square || eventData.image_url}
